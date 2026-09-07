@@ -1,0 +1,40 @@
+# Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+.uv/
+
+# Environment Files & Secrets (Protect Keys)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+*.crt
+*.p12
+id_rsa
+id_rsa.pub
+service_account.json
+secrets.yaml
+
+# Python Caches & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Pytest & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Operating System & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Database & Storage Caches
+*.sqlite3
+*.db
