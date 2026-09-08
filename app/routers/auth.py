@@ -36,7 +36,7 @@ def logout(current_user: User = Depends(get_current_user),credentials: HTTPAutho
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="Missing access token")
     
     try:
-        supabase_service.auth.sign_out(jwt=access_token)
+        supabase_service.auth.admin.sign_out(access_token, scope="local")
         logger.info(f"User signed out from Supabase: {current_user.id}")
     except Exception as e:
         logger.warning(f"Supabase sign_out failed (non-critical): {str(e)}")
@@ -56,14 +56,14 @@ def logout(current_user: User = Depends(get_current_user),credentials: HTTPAutho
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail="Failed to logout")
 
 @router.post("/logout-all-devices", status_code=status.HTTP_204_NO_CONTENT)
-def logout_all_devices(current_user: User = Depends(get_current_user),credentials: HTTPAuthorizationCredentials = Depends(security),db: Session = Depends(get_db)):    
+def logout_all_devices(current_user: User = Depends(get_current_user), credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):    
     access_token = credentials.credentials if credentials else None
     
     if not access_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="Missing access token")
     
     try:
-        supabase_service.auth.sign_out(jwt=access_token)
+        supabase_service.auth.admin.sign_out(access_token, scope="global")
         logger.info(f"User signed out from Supabase: {current_user.id}")
     except Exception as e:
         logger.warning(f"Supabase sign_out failed (non-critical): {str(e)}")

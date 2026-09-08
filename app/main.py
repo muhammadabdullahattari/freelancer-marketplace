@@ -22,5 +22,4 @@ app.include_router(Userrouter)
 
 @app.get("/")
 def root():
-    print("check yml")
     return {"message": "API is running"}
