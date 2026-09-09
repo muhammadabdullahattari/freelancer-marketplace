@@ -10,6 +10,7 @@ from uuid import UUID
 from datetime import datetime, timezone
 import logging
 from app.core.errors import BusinessLogicException, ErrorCode
+from app.core.errors import BusinessLogicException, ErrorCode, ResourceNotFoundException, AuthorizationException
 
 
 logger = logging.getLogger(__name__)
@@ -64,25 +65,28 @@ def get_job(db: Session, job_id: UUID) -> Job:
     
     return job
 
-
-def update_job(db: Session, job_id: UUID, client_id: UUID, job_data: JobUpdate) -> Job:
+def update_job(db: Session, job_id: UUID, client_id: UUID, job_data) -> Job:
     job = get_job(db, job_id)
     
     if job.client_id != client_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,detail="Not authorized to update this job")
+        raise AuthorizationException("Not authorized to update this job")
     
     if job.status != JobStatus.DRAFT:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="Can only update jobs in DRAFT status")
+        raise BusinessLogicException(ErrorCode.INVALID_STATE_TRANSITION,"Can only update jobs in DRAFT status")
     
     try:
-        update_dict = job_data.model_dump(exclude_unset=True)
-        for field, value in update_dict.items():
+        if hasattr(job_data, 'model_dump'):
+            data_dict = job_data.model_dump(exclude_unset=True)
+        else:
+            data_dict = job_data
+        
+        for field, value in data_dict.items():
             if field == "skill_ids":
-                continue 
+                continue  # Handle separately
             if hasattr(job, field):
                 setattr(job, field, value)
         
-        if "skill_ids" in update_dict and update_dict["skill_ids"] is not None:
+        if "skill_ids" in data_dict  and data_dict ["skill_ids"] is not None:
             db.query(JobSkill).filter(JobSkill.job_id == job_id).delete()
             for skill_id in update_dict["skill_ids"]:
                 skill = db.query(Skill).filter(Skill.id == skill_id).first()

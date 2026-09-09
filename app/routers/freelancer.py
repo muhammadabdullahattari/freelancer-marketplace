@@ -21,7 +21,7 @@ router = APIRouter(prefix="/api/freelancer", tags=["Freelancer Profile"])
 
 
 @router.post("/profile", response_model=FreelancerProfileResponse, status_code=201)
-async def create_profile_endpoint(profile_data: FreelancerProfileCreate,current_user: User = Depends(get_current_freelancer_user),
+def create_profile_endpoint(profile_data: FreelancerProfileCreate,current_user: User = Depends(get_current_freelancer_user),
                                   db: Session = Depends(get_db)):
     logger.info(f"Creating freelancer profile for user {current_user.id}")
     
@@ -44,7 +44,7 @@ async def create_profile_endpoint(profile_data: FreelancerProfileCreate,current_
 
 
 @router.get("/profile", response_model=FreelancerProfileResponse)
-async def get_profile_endpoint(current_user: User = Depends(get_current_freelancer_user),db: Session = Depends(get_db)):
+def get_profile_endpoint(current_user: User = Depends(get_current_freelancer_user),db: Session = Depends(get_db)):
     
     logger.info(f"Fetching profile for user {current_user.id}")
     profile = db.query(FreelancerProfile).filter(FreelancerProfile.user_id == current_user.id,FreelancerProfile.deleted_at == None).first()
@@ -56,7 +56,7 @@ async def get_profile_endpoint(current_user: User = Depends(get_current_freelanc
 
 
 @router.patch("/profile", response_model=FreelancerProfileResponse)
-async def update_profile_endpoint(profile_data: FreelancerProfileUpdate,current_user: User = Depends(get_current_freelancer_user),
+def update_profile_endpoint(profile_data: FreelancerProfileUpdate,current_user: User = Depends(get_current_freelancer_user),
                                   db: Session = Depends(get_db)):
 
     logger.info(f"Updating profile for user {current_user.id}")
@@ -82,7 +82,7 @@ async def update_profile_endpoint(profile_data: FreelancerProfileUpdate,current_
 
 
 @router.get("/{freelancer_id}", response_model=FreelancerProfileResponse)
-async def get_freelancer_profile_endpoint(freelancer_id: str,db: Session = Depends(get_db)):
+def get_freelancer_profile_endpoint(freelancer_id: str,db: Session = Depends(get_db)):
 
     logger.info(f"Fetching freelancer profile: {freelancer_id}")
     profile = db.query(FreelancerProfile).filter(FreelancerProfile.id == freelancer_id,FreelancerProfile.deleted_at == None).first()
@@ -94,7 +94,7 @@ async def get_freelancer_profile_endpoint(freelancer_id: str,db: Session = Depen
 
 
 @router.post("/profile/skills", response_model=FreelancerSkillResponse, status_code=201)
-async def add_skill_endpoint(skill_data: FreelancerSkillCreate,current_user: User = Depends(get_current_freelancer_user),
+def add_skill_endpoint(skill_data: FreelancerSkillCreate,current_user: User = Depends(get_current_freelancer_user),
                              db: Session = Depends(get_db)):
     
     logger.info(f"Adding skill to freelancer {current_user.id}")
@@ -127,7 +127,7 @@ async def add_skill_endpoint(skill_data: FreelancerSkillCreate,current_user: Use
 
 
 @router.delete("/profile/skills/{skill_id}", status_code=204)
-async def remove_skill_endpoint(skill_id: str,current_user: User = Depends(get_current_freelancer_user),
+def remove_skill_endpoint(skill_id: str,current_user: User = Depends(get_current_freelancer_user),
                                 db: Session = Depends(get_db)):
     
     logger.info(f"Removing skill {skill_id} from freelancer {current_user.id}")

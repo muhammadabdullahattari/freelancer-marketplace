@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/skills", tags=["Skills"])
 
 @router.post("/", response_model=SkillResponse, status_code=201)
-async def create_skill_endpoint(skill_data: SkillCreate,db: Session = Depends(get_db)):
+def create_skill_endpoint(skill_data: SkillCreate,db: Session = Depends(get_db)):
     
     logger.info(f"Creating skill: {skill_data.name}")
     existing = db.query(Skill).filter(Skill.name.ilike(skill_data.name)).first()
@@ -34,7 +34,7 @@ async def create_skill_endpoint(skill_data: SkillCreate,db: Session = Depends(ge
         raise
 
 @router.get("/{skill_id}", response_model=SkillResponse)
-async def get_skill_endpoint(skill_id: str,db: Session = Depends(get_db)):
+def get_skill_endpoint(skill_id: str,db: Session = Depends(get_db)):
 
     logger.info(f"Fetching skill: {skill_id}")    
     skill = db.query(Skill).filter(Skill.id == UUID(skill_id)).first()
@@ -45,7 +45,7 @@ async def get_skill_endpoint(skill_id: str,db: Session = Depends(get_db)):
     return skill
 
 @router.patch("/{skill_id}", response_model=SkillResponse)
-async def update_skill_endpoint(skill_id: str,skill_data: SkillUpdate,db: Session = Depends(get_db)):
+def update_skill_endpoint(skill_id: str,skill_data: SkillUpdate,db: Session = Depends(get_db)):
     
     logger.info(f"Updating skill: {skill_id}")
     skill = db.query(Skill).filter(Skill.id == UUID(skill_id)).first()
@@ -69,7 +69,7 @@ async def update_skill_endpoint(skill_id: str,skill_data: SkillUpdate,db: Sessio
         raise
 
 @router.delete("/{skill_id}", status_code=204)
-async def delete_skill_endpoint(skill_id: str,db: Session = Depends(get_db)):
+def delete_skill_endpoint(skill_id: str,db: Session = Depends(get_db)):
     
     logger.info(f"Deleting skill: {skill_id}")    
     skill = db.query(Skill).filter(Skill.id == UUID(skill_id)).first()
@@ -97,7 +97,7 @@ async def delete_skill_endpoint(skill_id: str,db: Session = Depends(get_db)):
         raise
 
 @router.get("/", response_model=list[SkillResponse])
-async def list_skills_endpoint(skip: int = Query(0, ge=0),limit: int = Query(100, ge=1, le=1000),
+def list_skills_endpoint(skip: int = Query(0, ge=0),limit: int = Query(100, ge=1, le=1000),
                                search: str = Query(None),db: Session = Depends(get_db)):
     
     logger.info(f"Listing skills - skip: {skip}, limit: {limit}")

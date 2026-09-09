@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/proposals", tags=["Proposals"])
 
 
 @router.post("/", response_model=ProposalResponse, status_code=201)
-async def submit_proposal_endpoint(job_id: str,proposal_data: ProposalCreate,current_user: User = Depends(get_current_freelancer_user),
+def submit_proposal_endpoint(job_id: str,proposal_data: ProposalCreate,current_user: User = Depends(get_current_freelancer_user),
                                    db: Session = Depends(get_db)):
     
     logger.info(f"Freelancer {current_user.id} submitting proposal for job {job_id}")
@@ -28,18 +28,18 @@ async def submit_proposal_endpoint(job_id: str,proposal_data: ProposalCreate,cur
     if not freelancer:
         raise ResourceNotFoundException("Freelancer profile")
     
-    return submit_proposal(db, UUID(job_id), freelancer.id, proposal_data.model_dump())
+    return submit_proposal(db, UUID(job_id), freelancer.id, proposal_data)
 
 
 @router.get("/{proposal_id}", response_model=ProposalResponse)
-async def get_proposal_endpoint(proposal_id: str,db: Session = Depends(get_db)):
+def get_proposal_endpoint(proposal_id: str,db: Session = Depends(get_db)):
     logger.info(f"Fetching proposal: {proposal_id}")
     
     return get_proposal(db, UUID(proposal_id))
 
 
 @router.post("/{proposal_id}/accept", response_model=ProposalResponse)
-async def accept_proposal_endpoint(proposal_id: str,current_user: User = Depends(get_current_client_user),
+def accept_proposal_endpoint(proposal_id: str,current_user: User = Depends(get_current_client_user),
                                    db: Session = Depends(get_db)):
     
     logger.info(f"Client {current_user.id} accepting proposal {proposal_id}")
@@ -47,7 +47,7 @@ async def accept_proposal_endpoint(proposal_id: str,current_user: User = Depends
     return accept_proposal(db, UUID(proposal_id), current_user.id)
 
 @router.post("/{proposal_id}/reject", response_model=ProposalResponse)
-async def reject_proposal_endpoint(proposal_id: str,current_user: User = Depends(get_current_client_user),
+def reject_proposal_endpoint(proposal_id: str,current_user: User = Depends(get_current_client_user),
                                    db: Session = Depends(get_db)):
     
     logger.info(f"Client {current_user.id} rejecting proposal {proposal_id}")
@@ -56,7 +56,7 @@ async def reject_proposal_endpoint(proposal_id: str,current_user: User = Depends
 
 
 @router.post("/{proposal_id}/withdraw", status_code=204)
-async def withdraw_proposal_endpoint(proposal_id: str,current_user: User = Depends(get_current_freelancer_user),
+def withdraw_proposal_endpoint(proposal_id: str,current_user: User = Depends(get_current_freelancer_user),
                                      db: Session = Depends(get_db)):
     
     logger.info(f"Freelancer {current_user.id} withdrawing proposal {proposal_id}")
@@ -69,7 +69,7 @@ async def withdraw_proposal_endpoint(proposal_id: str,current_user: User = Depen
 
 
 @router.get("/job/{job_id}", response_model=ProposalsListPaginatedResponse)
-async def get_job_proposals_endpoint(job_id: str,skip: int = Query(0, ge=0),limit: int = Query(10, ge=1, le=100),
+def get_job_proposals_endpoint(job_id: str,skip: int = Query(0, ge=0),limit: int = Query(10, ge=1, le=100),
     status: str = Query(None),current_user: User = Depends(get_current_client_user),db: Session = Depends(get_db)):
     
     logger.info(f"Listing proposals for job {job_id}")
@@ -84,7 +84,7 @@ async def get_job_proposals_endpoint(job_id: str,skip: int = Query(0, ge=0),limi
 
 
 @router.get("/me/submitted", response_model=ProposalsListPaginatedResponse)
-async def get_my_proposals_endpoint(skip: int = Query(0, ge=0),limit: int = Query(10, ge=1, le=100),
+def get_my_proposals_endpoint(skip: int = Query(0, ge=0),limit: int = Query(10, ge=1, le=100),
                                     status: str = Query(None),current_user: User = Depends(get_current_freelancer_user),db: Session = Depends(get_db)):
     
     logger.info(f"Listing proposals by freelancer {current_user.id}")

@@ -19,27 +19,27 @@ router = APIRouter(prefix="/api/contracts", tags=["Contracts"])
 
 
 @router.get("/{contract_id}", response_model=ContractResponse)
-async def get_contract_endpoint(contract_id: str,db: Session = Depends(get_db)):
+def get_contract_endpoint(contract_id: str,db: Session = Depends(get_db)):
     logger.info(f"Fetching contract: {contract_id}")
     
     return get_contract(db, UUID(contract_id))
 
 
 @router.post("/{contract_id}/milestones", response_model=MilestoneResponse, status_code=201)
-async def add_milestone_endpoint(contract_id: str,milestone_data: MilestoneCreate,current_user: User = Depends(get_current_user),db: Session = Depends(get_db)):
+def add_milestone_endpoint(contract_id: str,milestone_data: MilestoneCreate,current_user: User = Depends(get_current_user),db: Session = Depends(get_db)):
     logger.info(f"Adding milestone to contract {contract_id}")
     
     return add_milestone(db, UUID(contract_id), current_user.id, milestone_data.model_dump())
 
 
 @router.get("/{contract_id}/milestones", response_model=list[MilestoneResponse])
-async def get_contract_milestones_endpoint(contract_id: str,db: Session = Depends(get_db)):
+def get_contract_milestones_endpoint(contract_id: str,db: Session = Depends(get_db)):
     logger.info(f"Fetching milestones for contract {contract_id}")
     
     return get_contract_milestones(db, UUID(contract_id))
 
 @router.post("/{contract_id}/complete", response_model=ContractResponse)
-async def complete_contract_endpoint(contract_id: str,current_user: User = Depends(get_current_user),
+def complete_contract_endpoint(contract_id: str,current_user: User = Depends(get_current_user),
                                      db: Session = Depends(get_db)):
     logger.info(f"Completing contract {contract_id}")
     
@@ -47,7 +47,7 @@ async def complete_contract_endpoint(contract_id: str,current_user: User = Depen
 
 
 @router.post("/{contract_id}/cancel", status_code=204)
-async def cancel_contract_endpoint(contract_id: str,current_user: User = Depends(get_current_user),
+def cancel_contract_endpoint(contract_id: str,current_user: User = Depends(get_current_user),
                                    db: Session = Depends(get_db)):
     
     logger.info(f"Cancelling contract {contract_id}")
@@ -55,7 +55,7 @@ async def cancel_contract_endpoint(contract_id: str,current_user: User = Depends
 
 
 @router.get("/", response_model=ContractsListPaginatedResponse)
-async def list_contracts_endpoint(skip: int = Query(0, ge=0),limit: int = Query(10, ge=1, le=100),status: str = Query(None),
+def list_contracts_endpoint(skip: int = Query(0, ge=0),limit: int = Query(10, ge=1, le=100),status: str = Query(None),
                                   current_user: User = Depends(get_current_user),db: Session = Depends(get_db)):
     
     logger.info(f"Listing contracts for user {current_user.id}")

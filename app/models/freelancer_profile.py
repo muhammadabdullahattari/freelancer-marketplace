@@ -4,12 +4,13 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 from sqlalchemy import Uuid
 from uuid import UUID
+from app.models.base import SoftDeleteMixin
+import uuid
 
-
-class FreelancerProfile(Base):
+class FreelancerProfile(Base,SoftDeleteMixin):
     __tablename__ = "freelancer_profiles"
 
-    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
     bio: Mapped[str | None] = mapped_column(Text, nullable=True)
     title: Mapped[str | None] = mapped_column(String(150), nullable=True)

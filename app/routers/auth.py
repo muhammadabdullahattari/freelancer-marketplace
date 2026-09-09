@@ -27,7 +27,7 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
     return create_user(db, user)
 
 @router.post("/login", response_model=Token)
-def login(user_data: UserLogin, request: Request, db: Session = Depends(get_db)):
+def login(user_data: UserLogin, request: Request, response : Response ,db: Session = Depends(get_db)):
     
     logger.info(f"User login attempt: {user_data.email}")
     auth_response = authenticate_user(user_data, request, db)
