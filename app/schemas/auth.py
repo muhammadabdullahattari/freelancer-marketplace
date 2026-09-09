@@ -69,6 +69,9 @@ class Token(BaseModel):
     access_token: str
     refresh_token : str
     token_type: str
+    user_id: str
+    username: str
+    role: str
     
 class Refresh_Token(BaseModel):
     access_token: str
@@ -77,3 +80,15 @@ class Refresh_Token(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+    
+    
+class SessionInfo(BaseModel):
+    valid: bool
+    user_id: str
+    username: str
+    role: str
+
+
+class SessionResponse(BaseModel):
+    message: str
+    session_cleared: bool

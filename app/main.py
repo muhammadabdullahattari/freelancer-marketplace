@@ -8,6 +8,7 @@ from app.routers.milestones import router as Milestonesrouter
 from app.routers.proposals import router as Proposalsrouter
 from app.routers.reviews import router as Reviewsrouter
 from app.routers.skills import router as Skillsrouter
+from app.routers.sessions import router as Sessionsrouter
 from app.database import Base,engine
 import app.models
 from fastapi.exceptions import RequestValidationError, HTTPException 
@@ -16,12 +17,14 @@ from app.core.startup import startup_event
 from app.middleware.logging import RequestIDMiddleware, RequestLoggingMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.exceptions.handlers import setup_exception_handlers
+from app.middleware.csrf import CSRFProtectionMiddleware
 
 app = FastAPI(title="Freelancer Marketplace API")
 
 app.add_middleware(RateLimitMiddleware, requests_per_minute=100)
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(RequestIDMiddleware)
+app.add_middleware(CSRFProtectionMiddleware)
 
 setup_exception_handlers(app)
 
@@ -42,6 +45,7 @@ app.include_router(Proposalsrouter)
 app.include_router(Contractsrouter)
 app.include_router(Milestonesrouter)
 app.include_router(Reviewsrouter)
+app.include_router(Sessionsrouter)
 
 @app.get("/")
 def root():

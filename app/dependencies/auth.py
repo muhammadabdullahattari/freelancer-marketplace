@@ -7,43 +7,42 @@ from typing import Optional
 import logging
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from uuid import UUID
+from fastapi import Request
+from app.core.cookie_utils import CookieManager
 
 logger = logging.getLogger(__name__)
 security = HTTPBearer(auto_error=False)
 
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security),db: Session = Depends(get_db)) -> User:
+def get_current_user(request: Request,credentials: HTTPAuthorizationCredentials = Depends(security),
+                     db: Session = Depends(get_db)) -> User:
     
-    if credentials is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    token = None
+    
+    if credentials:
+        token = credentials.credentials
+    
+    if not token:
+        token = CookieManager.get_access_token_from_cookies(request)
+    
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="Not authenticated")
 
-    token = credentials.credentials
     payload = verify_supabase_token(token)
     user_id = payload.get("sub")
     
     if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token: missing user ID"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="Invalid token: missing user ID")
     
     user = db.query(User).filter(User.id == UUID(user_id)).first()
 
-    
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="User not found")
     
     if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is inactive"
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,detail="User account is inactive")
     
     return user
-
 
 def get_current_freelancer_user(current_user: User = Depends(get_current_user)) -> User:
 

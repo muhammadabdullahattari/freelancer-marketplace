@@ -7,6 +7,7 @@ from .milestones import router as milestones_router
 from .proposals import router as proposals_router
 from .reviews import router as reviews_router
 from .skills import router as skills_router
+from .sessions import router as Sessions_router
 
 __all__ = [
     "auth_router",
@@ -17,5 +18,6 @@ __all__ = [
     "milestones_router",
     "proposals_router",
     "reviews_router",
-    "skills_router"
+    "skills_router",
+    "Sessions_router"
 ]

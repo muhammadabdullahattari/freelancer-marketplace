@@ -168,7 +168,10 @@ def authenticate_user(user_data: UserLogin, request: Request, db: Session):
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
-        "token_type": "bearer"
+        "token_type": "bearer",
+        "user_id": str(user.id),
+        "username": user.username,
+        "role": user.role
     }
     
 def refresh_access_token(old_refresh_token: str, db: Session) -> dict:
