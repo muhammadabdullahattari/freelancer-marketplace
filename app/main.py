@@ -9,6 +9,7 @@ from app.routers.proposals import router as Proposalsrouter
 from app.routers.reviews import router as Reviewsrouter
 from app.routers.skills import router as Skillsrouter
 from app.routers.sessions import router as Sessionsrouter
+from app.routers.uploads import router as Uploadsrouter
 from app.database import Base,engine
 import app.models
 from fastapi.exceptions import RequestValidationError, HTTPException 
@@ -46,6 +47,7 @@ app.include_router(Contractsrouter)
 app.include_router(Milestonesrouter)
 app.include_router(Reviewsrouter)
 app.include_router(Sessionsrouter)
+app.include_router(Uploadsrouter)
 
 @app.get("/")
 def root():

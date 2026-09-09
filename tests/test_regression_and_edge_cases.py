@@ -120,7 +120,7 @@ def test_unassigned_client_cannot_release_milestone_payment(
         id=uuid.uuid4(),
         email="other_client@example.com",
         username="other_client_user",
-        password_hash="password_hash",
+        name="Other Client",
         role="CLIENT",
         is_active=True,
     )
@@ -174,7 +174,7 @@ def test_unassigned_freelancer_cannot_submit_milestone(
         id=uuid.uuid4(),
         email="other_freelancer@example.com",
         username="other_freelancer_user",
-        hashed_password="hashed_password",
+        name="Other Freelancer",
         role="FREELANCER",
         is_active=True,
     )

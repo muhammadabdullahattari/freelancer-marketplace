@@ -9,6 +9,7 @@ from app.models.proposal import Proposal
 from app.models.contract import Contract
 from app.models.milestone import Milestone
 from app.models.review import Review
+from app.models.file_upload import  FileUpload
 
 __all__ = [
     "User",
@@ -22,4 +23,5 @@ __all__ = [
     "Contract",
     "Milestone",
     "Review",
+    "FileUpload"
 ]
