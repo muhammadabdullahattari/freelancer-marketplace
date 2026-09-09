@@ -6,6 +6,7 @@ from sqlalchemy import Uuid
 from uuid import UUID
 import uuid
 import enum
+from app.models.base import SoftDeleteMixin
 
 
 class JobStatus(str, enum.Enum):
@@ -16,7 +17,7 @@ class JobStatus(str, enum.Enum):
     COMPLETED = "COMPLETED"
 
 
-class Job(Base):
+class Job(Base,SoftDeleteMixin):
     __tablename__ = "jobs"
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)

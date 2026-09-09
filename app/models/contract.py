@@ -6,7 +6,7 @@ from sqlalchemy import Uuid
 from uuid import UUID
 import uuid
 import enum
-
+from app.models.base import SoftDeleteMixin
 
 class ContractStatus(str, enum.Enum):
     ACTIVE = "ACTIVE"
@@ -16,7 +16,7 @@ class ContractStatus(str, enum.Enum):
     CANCELLED = "CANCELLED"
 
 
-class Contract(Base):
+class Contract(Base,SoftDeleteMixin):
     __tablename__ = "contracts"
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)

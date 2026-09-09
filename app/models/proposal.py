@@ -6,6 +6,7 @@ from sqlalchemy import Uuid
 from uuid import UUID
 import uuid
 import enum
+from app.models.base import SoftDeleteMixin
 
 
 class ProposalStatus(str, enum.Enum):
@@ -16,7 +17,7 @@ class ProposalStatus(str, enum.Enum):
     WITHDRAWN = "WITHDRAWN"
 
 
-class Proposal(Base):
+class Proposal(Base,SoftDeleteMixin):
     __tablename__ = "proposals"
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
