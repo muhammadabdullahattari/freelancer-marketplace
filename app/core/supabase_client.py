@@ -4,10 +4,20 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-logger.info("Supabase service key configured: %s",bool(settings.SUPABASE_SERVICE_KEY))
-print("SUPABASE SERVICE KEY CONFIGURED:", bool(settings.SUPABASE_SERVICE_KEY))
-supabase: Client = create_client(settings.SUPABASE_URL,settings.SUPABASE_KEY)
-supabase_service: Client = create_client(settings.SUPABASE_URL,settings.SUPABASE_SERVICE_KEY)
+key = settings.SUPABASE_SERVICE_KEY
+
+print("SERVICE KEY CONFIGURED:", bool(key))
+print("SERVICE KEY PREFIX:", key[:10] if key else "EMPTY")
+
+supabase: Client = create_client(
+    settings.SUPABASE_URL,
+    settings.SUPABASE_KEY
+)
+
+supabase_service: Client = create_client(
+    settings.SUPABASE_URL,
+    settings.SUPABASE_SERVICE_KEY
+)
 
 def get_supabase_client() -> Client:
     return supabase
