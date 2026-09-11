@@ -6,7 +6,7 @@ from app.models.contract import Contract, ContractStatus
 from app.models.freelancer_profile import FreelancerProfile
 from uuid import UUID
 from datetime import datetime, timezone
-from app.schemas.review import ReviewCreate
+from app.schemas.review import ReviewCreate, ReviewUpdate
 import logging
 
 logger = logging.getLogger(__name__)
@@ -84,6 +84,58 @@ def get_review(db: Session, review_id: UUID) -> Review:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="Review not found")
     
     return review
+
+
+def update_review(db: Session, review_id: UUID, user_id: UUID, update_data: ReviewUpdate) -> Review:
+    review = get_review(db, review_id)
+    
+    if review.reviewer_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the author of this review can update it"
+        )
+    
+    if isinstance(update_data, dict):
+        new_rating = update_data.get("rating")
+        new_title = update_data.get("title")
+        new_comment = update_data.get("comment")
+    else:
+        new_rating = update_data.rating
+        new_title = update_data.title
+        new_comment = update_data.comment
+    
+    if new_rating is not None:
+        if new_rating < 1 or new_rating > 5:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Rating must be between 1 and 5"
+            )
+        review.rating = new_rating
+        
+    if new_title is not None:
+        review.title = new_title
+        
+    if new_comment is not None:
+        review.comment = new_comment
+        
+    review.updated_at = datetime.now(timezone.utc)
+    
+    try:
+        db.commit()
+        db.refresh(review)
+        
+        if review.contract and review.contract.client_id == user_id:
+            update_freelancer_rating(db, review.freelancer_id)
+            
+        logger.info(f"Review updated: {review_id}")
+        return review
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Failed to update review {review_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update review"
+        )
 
 
 def get_freelancer_reviews(db: Session,freelancer_id: UUID,skip: int = 0,limit: int = 10) -> tuple[list[Review], int]:
