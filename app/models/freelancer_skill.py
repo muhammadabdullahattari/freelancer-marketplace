@@ -6,10 +6,13 @@ from sqlalchemy import Uuid
 from uuid import UUID
 
 
+import uuid
+
+
 class FreelancerSkill(Base):
     __tablename__ = "freelancer_skills"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     freelancer_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("freelancer_profiles.id", ondelete="CASCADE"), nullable=False, index=True)
     skill_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("skills.id", ondelete="CASCADE"), nullable=False, index=True)
     proficiency_level: Mapped[str] = mapped_column(default="INTERMEDIATE", nullable=False)

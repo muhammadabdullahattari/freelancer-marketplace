@@ -88,7 +88,7 @@ def update_job(db: Session, job_id: UUID, client_id: UUID, job_data) -> Job:
         
         if "skill_ids" in data_dict  and data_dict ["skill_ids"] is not None:
             db.query(JobSkill).filter(JobSkill.job_id == job_id).delete()
-            for skill_id in update_dict["skill_ids"]:
+            for skill_id in data_dict["skill_ids"]:
                 skill = db.query(Skill).filter(Skill.id == skill_id).first()
                 if not skill:
                     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"Skill {skill_id} not found")

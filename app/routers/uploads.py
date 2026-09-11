@@ -23,7 +23,7 @@ from uuid import UUID
 import logging
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/v1/uploads", tags=["File Uploads"])
+router = APIRouter(prefix="/uploads", tags=["File Uploads"])
 
 
 @router.post("/profile-picture", response_model=ProfilePictureUploadResponse, status_code=201)

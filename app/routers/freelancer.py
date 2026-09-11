@@ -17,7 +17,7 @@ from app.models.skill import Skill
 from app.core.errors import ConflictException
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/freelancer", tags=["Freelancer Profile"])
+router = APIRouter(prefix="/freelancer", tags=["Freelancer Profile"])
 
 
 @router.post("/profile", response_model=FreelancerProfileResponse, status_code=201)
@@ -60,7 +60,7 @@ def update_profile_endpoint(profile_data: FreelancerProfileUpdate,current_user: 
                                   db: Session = Depends(get_db)):
 
     logger.info(f"Updating profile for user {current_user.id}")
-    profile = db.query(FreelancerProfile).filter(FreelancerProfile.user_id == current_user.idFreelancerProfile.deleted_at == None).first()
+    profile = db.query(FreelancerProfile).filter(FreelancerProfile.user_id == current_user.id,FreelancerProfile.deleted_at == None).first()
     
     if not profile:
         raise ResourceNotFoundException("Freelancer profile")

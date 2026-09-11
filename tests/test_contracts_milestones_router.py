@@ -76,7 +76,7 @@ def test_contract_milestone_payment_and_amount_paid_data_consistency(
     # 5. Release Payment for Milestone 1 via Endpoint
     mock_supabase["public"]._current_mock_user_id = str(client_user.id)
     c_headers = {"Authorization": "Bearer mock_client_token"}
-    pay_res = client.post(f"/api/milestones/{milestone1.id}/release-payment", headers=c_headers)
+    pay_res = client.post(f"/milestones/{milestone1.id}/release-payment", headers=c_headers)
     assert pay_res.status_code == 200
     assert pay_res.json()["status"] == "PAYMENT_RELEASED"
 
@@ -127,7 +127,136 @@ def test_cannot_complete_contract_with_pending_milestones(
 
     mock_supabase["public"]._current_mock_user_id = str(client_user.id)
     c_headers = {"Authorization": "Bearer mock_client_token"}
-    comp_res = client.post(f"/api/contracts/{contract.id}/complete", headers=c_headers)
+    comp_res = client.post(f"/contracts/{contract.id}/complete", headers=c_headers)
     assert comp_res.status_code == 400
     error_text = comp_res.json().get("message") or comp_res.json().get("detail") or ""
     assert "milestones" in str(error_text).lower() or "pending" in str(error_text).lower()
+
+
+def test_add_milestone_exceeding_contract_total_amount(
+    client: TestClient, client_user: User, freelancer_user: User, mock_supabase, db_session
+):
+    """Test behavior when adding a milestone with price exceeding contract total_amount."""
+    freelancer_prof = FreelancerProfile(id=uuid.uuid4(), user_id=freelancer_user.id, title="Developer")
+    db_session.add(freelancer_prof)
+
+    job = Job(id=uuid.uuid4(), client_id=client_user.id, title="Job Title", description="Description text long enough")
+    db_session.add(job)
+
+    proposal = Proposal(id=uuid.uuid4(), job_id=job.id, freelancer_id=freelancer_prof.id, cover_letter="Letter content text", proposed_rate=500.0)
+    db_session.add(proposal)
+
+    contract = Contract(
+        id=uuid.uuid4(),
+        job_id=job.id,
+        proposal_id=proposal.id,
+        client_id=client_user.id,
+        freelancer_id=freelancer_prof.id,
+        title="Fixed Contract",
+        total_amount=500.0,
+        status=ContractStatus.ACTIVE,
+    )
+    db_session.add(contract)
+    db_session.commit()
+
+    mock_supabase["public"]._current_mock_user_id = str(client_user.id)
+    headers = {"Authorization": "Bearer mock_client_token"}
+
+    # Attempt to add a milestone of $1000 on a $500 contract
+    payload = {
+        "title": "Overpriced Milestone",
+        "description": "Milestone with price exceeding contract total",
+        "amount": 1000.0,
+        "order": 1,
+    }
+
+    res = client.post(f"/contracts/{contract.id}/milestones", json=payload, headers=headers)
+    print("\n[TEST OUTPUT OVERPRICED MILESTONE]:", res.status_code, res.json())
+    assert res.status_code == 400
+    assert "exceeds" in str(res.json()).lower() or "budget" in str(res.json()).lower()
+
+
+def test_add_milestone_duplicate_order_number(
+    client: TestClient, client_user: User, freelancer_user: User, mock_supabase, db_session
+):
+    """Test behavior when adding duplicate milestone order numbers to the same contract."""
+    freelancer_prof = FreelancerProfile(id=uuid.uuid4(), user_id=freelancer_user.id, title="Developer")
+    db_session.add(freelancer_prof)
+
+    job = Job(id=uuid.uuid4(), client_id=client_user.id, title="Job Title", description="Description text long enough")
+    db_session.add(job)
+
+    proposal = Proposal(id=uuid.uuid4(), job_id=job.id, freelancer_id=freelancer_prof.id, cover_letter="Letter content text", proposed_rate=500.0)
+    db_session.add(proposal)
+
+    contract = Contract(
+        id=uuid.uuid4(),
+        job_id=job.id,
+        proposal_id=proposal.id,
+        client_id=client_user.id,
+        freelancer_id=freelancer_prof.id,
+        title="Fixed Contract",
+        total_amount=1000.0,
+        status=ContractStatus.ACTIVE,
+    )
+    db_session.add(contract)
+
+    milestone1 = Milestone(
+        id=uuid.uuid4(),
+        contract_id=contract.id,
+        title="Milestone 1",
+        amount=500.0,
+        order=1,
+    )
+    db_session.add(milestone1)
+    db_session.commit()
+
+    mock_supabase["public"]._current_mock_user_id = str(client_user.id)
+    headers = {"Authorization": "Bearer mock_client_token"}
+
+    # Attempt to add another milestone with order=1 on the same contract
+    payload = {
+        "title": "Duplicate Order Milestone",
+        "amount": 300.0,
+        "order": 1,
+    }
+
+    res = client.post(f"/contracts/{contract.id}/milestones", json=payload, headers=headers)
+    print("\n[TEST OUTPUT DUPLICATE ORDER]:", res.status_code, res.json())
+    assert res.status_code == 400
+    assert "already exists" in str(res.json()).lower() or "order" in str(res.json()).lower()
+
+
+def test_cancel_contract_requires_pending_milestone(
+    client: TestClient, client_user: User, freelancer_user: User, mock_supabase, db_session
+):
+    """Test cancelling a contract fails if there are no pending milestones."""
+    freelancer_prof = FreelancerProfile(id=uuid.uuid4(), user_id=freelancer_user.id, title="Developer")
+    db_session.add(freelancer_prof)
+
+    job = Job(id=uuid.uuid4(), client_id=client_user.id, title="Job Title", description="Description text long enough")
+    db_session.add(job)
+
+    proposal = Proposal(id=uuid.uuid4(), job_id=job.id, freelancer_id=freelancer_prof.id, cover_letter="Letter content text", proposed_rate=500.0)
+    db_session.add(proposal)
+
+    contract = Contract(
+        id=uuid.uuid4(),
+        job_id=job.id,
+        proposal_id=proposal.id,
+        client_id=client_user.id,
+        freelancer_id=freelancer_prof.id,
+        title="Fixed Contract",
+        total_amount=1000.0,
+        status=ContractStatus.ACTIVE,
+    )
+    db_session.add(contract)
+    db_session.commit()
+
+    mock_supabase["public"]._current_mock_user_id = str(client_user.id)
+    headers = {"Authorization": "Bearer mock_client_token"}
+
+    # Attempt to cancel contract without any PENDING milestone
+    res = client.post(f"/contracts/{contract.id}/cancel", headers=headers)
+    assert res.status_code == 400
+    assert "pending milestone" in str(res.json()).lower()

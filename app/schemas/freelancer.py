@@ -2,16 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 from uuid import UUID
-
-
-class SkillResponse(BaseModel):
-    id: UUID
-    name: str
-    proficiency_level: str
-    years_experience: Optional[int] = None
-
-    class Config:
-        from_attributes = True
+from app.schemas.skill import SkillResponse, FreelancerSkillResponse
 
 
 class FreelancerProfileCreate(BaseModel):
@@ -42,7 +33,7 @@ class FreelancerProfileResponse(BaseModel):
     total_hours_worked: float
     average_rating: Optional[float]
     total_reviews: int
-    skills: list[SkillResponse] = []
+    skills: list[FreelancerSkillResponse] = []
     created_at: datetime
     updated_at: datetime
 

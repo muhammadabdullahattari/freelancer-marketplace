@@ -10,7 +10,7 @@ import logging
 from app.schemas.sessions import SessionResponse
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/sessions", tags=["Sessions"])
+router = APIRouter(prefix="/sessions", tags=["Sessions"])
 
 @router.get("/", response_model=list[SessionResponse])
 def get_active_sessions_endpoint(current_user: User = Depends(get_current_user),db: Session = Depends(get_db)):

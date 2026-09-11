@@ -61,33 +61,5 @@ class UserUpdate(BaseModel):
 class UserPatch(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
-    phone_number: Optional[str] = Field(pattern=r"^03\d{9}$",description="Pakistani mobile number, e.g. 03001234567")
+    phone_number: Optional[str] = Field(default=None, pattern=r"^03\d{9}$", description="Pakistani mobile number, e.g. 03001234567")
     
-    @field_validator("phone_number")
-    @classmethod
-    def validate_phone_number(cls, value: str) -> str:
-        value = value.strip()
-
-        if not value.isdigit():
-            raise ValueError("Phone number must contain only digits")
-
-        if len(value) != 11:
-            raise ValueError("Phone number must contain exactly 11 digits")
-
-        if not value.startswith("03"):
-            raise ValueError("Phone number must start with 03")
-
-        return value
-    
-    @field_validator("first_name", "last_name")
-    @classmethod
-    def validate_name(cls, value: str | None) -> str | None:
-        if value is None:
-            return None
-
-        value = value.strip()
-
-        if not value:
-            raise ValueError("Name cannot be empty")
-
-        return value

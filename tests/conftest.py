@@ -136,6 +136,7 @@ def mock_supabase():
         patch("app.core.supabase_client.supabase", mock_pub),
         patch("app.core.security.supabase", mock_pub),
         patch("app.services.auth.supabase_service", mock_service),
+        patch("app.services.file_storage.supabase_service", mock_service),
         patch("app.routers.auth.supabase_service", mock_service),
         patch("app.routers.user.supabase_service", mock_service),
     ]

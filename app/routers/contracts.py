@@ -15,8 +15,30 @@ from app.models.freelancer_profile import FreelancerProfile
 
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/contracts", tags=["Contracts"])
+router = APIRouter(prefix="/contracts", tags=["Contracts"])
+    
+@router.get("/", response_model=ContractsListPaginatedResponse)
+def list_contracts_endpoint(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(10, ge=1, le=100),
+    status: str = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    logger.info(f"Listing contracts for user {current_user.id}")
+    freelancer = db.query(FreelancerProfile).filter(FreelancerProfile.user_id == current_user.id).first()
 
+    if freelancer:
+        contracts, total = get_user_contracts(db, current_user.id, "FREELANCER", status, skip, limit)
+    else:
+        contracts, total = get_user_contracts(db, current_user.id, "CLIENT", status, skip, limit)
+
+    return {
+        "items": [ContractListResponse.model_validate(c) for c in contracts],
+        "total": total,
+        "skip": skip,
+        "limit": limit
+    }
 
 @router.get("/{contract_id}", response_model=ContractResponse)
 def get_contract_endpoint(contract_id: str,db: Session = Depends(get_db)):
@@ -29,7 +51,7 @@ def get_contract_endpoint(contract_id: str,db: Session = Depends(get_db)):
 def add_milestone_endpoint(contract_id: str,milestone_data: MilestoneCreate,current_user: User = Depends(get_current_user),db: Session = Depends(get_db)):
     logger.info(f"Adding milestone to contract {contract_id}")
     
-    return add_milestone(db, UUID(contract_id), current_user.id, milestone_data.model_dump())
+    return add_milestone(db, UUID(contract_id), current_user.id, milestone_data)
 
 
 @router.get("/{contract_id}/milestones", response_model=list[MilestoneResponse])
@@ -52,23 +74,3 @@ def cancel_contract_endpoint(contract_id: str,current_user: User = Depends(get_c
     
     logger.info(f"Cancelling contract {contract_id}")
     cancel_contract(db, UUID(contract_id), current_user.id)
-
-
-@router.get("/", response_model=ContractsListPaginatedResponse)
-def list_contracts_endpoint(skip: int = Query(0, ge=0),limit: int = Query(10, ge=1, le=100),status: str = Query(None),
-                                  current_user: User = Depends(get_current_user),db: Session = Depends(get_db)):
-    
-    logger.info(f"Listing contracts for user {current_user.id}")
-    freelancer = db.query(FreelancerProfile).filter(FreelancerProfile.user_id == current_user.id).first()
-    
-    if freelancer:
-        contracts, total = get_user_contracts(db, freelancer.id, "FREELANCER", status, skip, limit)
-    else:
-        contracts, total = get_user_contracts(db, current_user.id, "CLIENT", status, skip, limit)
-    
-    return {
-        "items": [ContractListResponse.model_validate(c) for c in contracts],
-        "total": total,
-        "skip": skip,
-        "limit": limit
-    }

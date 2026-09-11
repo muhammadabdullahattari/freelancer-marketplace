@@ -1,8 +1,13 @@
 from pydantic import BaseModel, Field
 from uuid import UUID
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Union
+from enum import Enum
 
+class ProficiencyLevel(str, Enum):
+    BEGINNER = "BEGINNER"
+    INTERMEDIATE = "INTERMEDIATE"
+    EXPERT = "EXPERT"
 
 class SkillCreate(BaseModel):
     name: str = Field(min_length=2, max_length=100)
@@ -27,15 +32,13 @@ class SkillResponse(BaseModel):
 
 class FreelancerSkillCreate(BaseModel):
     skill_id: UUID
-    proficiency_level: str = Field(default="INTERMEDIATE")
-    years_experience: Optional[int] = Field(None, ge=0)
+    proficiency_level: ProficiencyLevel = ProficiencyLevel.INTERMEDIATE
 
 
 class FreelancerSkillResponse(BaseModel):
-    id: int
+    id: Union[UUID, int]
     skill: SkillResponse
     proficiency_level: str
-    years_experience: Optional[int]
     created_at: datetime
 
     class Config:

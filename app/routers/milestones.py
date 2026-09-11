@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.dependencies.auth import get_current_user
@@ -6,13 +6,13 @@ from app.models.users import User
 from app.schemas.milestone import MilestoneResponse
 from app.services.milestone import (
     get_milestone, submit_milestone, approve_milestone,
-    reject_milestone, release_milestone_payment
+    reject_milestone, release_milestone_payment, delete_milestone
 )
 import logging
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/milestones", tags=["Milestones"])
+router = APIRouter(prefix="/milestones", tags=["Milestones"])
 
 
 @router.get("/{milestone_id}", response_model=MilestoneResponse)
@@ -39,3 +39,9 @@ def reject_milestone_endpoint(milestone_id: str,current_user: User = Depends(get
 def release_payment_endpoint(milestone_id: str,current_user: User = Depends(get_current_user),db: Session = Depends(get_db)):
     logger.info(f"Releasing payment for milestone {milestone_id}")
     return release_milestone_payment(db, UUID(milestone_id), current_user.id)
+
+@router.delete("/{milestone_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_milestone_endpoint(milestone_id: str,current_user: User = Depends(get_current_user),db: Session = Depends(get_db)):
+    logger.info(f"Deleting milestone: {milestone_id}")
+    delete_milestone(db, UUID(milestone_id), current_user.id)
+    return None

@@ -1,38 +1,61 @@
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 from uuid import UUID
+from enum import Enum
+from typing import Optional, Union
+from app.schemas.skill import SkillResponse
 
+
+class ProficiencyLevel(str, Enum):
+    BEGINNER = "BEGINNER"
+    INTERMEDIATE = "INTERMEDIATE"
+    EXPERT = "EXPERT"
+
+class BudgetType(str, Enum):
+    FIXED = "FIXED"
+    HOURLY = "HOURLY"
 
 class JobSkillResponse(BaseModel):
-    id: int
-    skill_id: UUID
-    skill_name: str
+    id: Union[UUID, int]
+    skill: SkillResponse
 
     class Config:
         from_attributes = True
 
-
 class JobCreate(BaseModel):
     title: str = Field(min_length=5, max_length=255)
     description: str = Field(min_length=20)
-    budget_type: str = Field(default="FIXED")  # FIXED or HOURLY
-    budget_min: Optional[float] = Field(None, ge=0)
-    budget_max: Optional[float] = Field(None, ge=0)
+    budget_type: BudgetType = BudgetType.FIXED  
+    budget_min: Optional[float] = Field(None, ge=1)
+    budget_max: Optional[float] = Field(None, ge=1)
     duration_estimate: Optional[str] = Field(None, max_length=50)
-    experience_level: str = Field(default="INTERMEDIATE")
+    experience_level: ProficiencyLevel = ProficiencyLevel.BEGINNER
     skill_ids: list[UUID] = []
+    
+    @field_validator("skill_ids")
+    @classmethod
+    def validate_unique_skills(cls, v: Optional[list[UUID]]) -> Optional[list[UUID]]:
+        if v is not None and len(v) != len(set(v)):
+            raise ValueError("Duplicate skill_ids are not allowed")
+        return v
 
 
 class JobUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=5, max_length=255)
-    description: Optional[str] = Field(None, min_length=20)
+    description: BudgetType = BudgetType.FIXED 
     budget_type: Optional[str] = None
-    budget_min: Optional[float] = Field(None, ge=0)
-    budget_max: Optional[float] = Field(None, ge=0)
+    budget_min: Optional[float] = Field(None, ge=1)
+    budget_max: Optional[float] = Field(None, ge=1)
     duration_estimate: Optional[str] = Field(None, max_length=50)
-    experience_level: Optional[str] = None
+    experience_level: ProficiencyLevel = ProficiencyLevel.BEGINNER
     skill_ids: Optional[list[UUID]] = None
+    
+    @field_validator("skill_ids")
+    @classmethod
+    def validate_unique_skills(cls, v: Optional[list[UUID]]) -> Optional[list[UUID]]:
+        if v is not None and len(v) != len(set(v)):
+            raise ValueError("Duplicate skill_ids are not allowed")
+        return v
 
 
 class JobResponse(BaseModel):

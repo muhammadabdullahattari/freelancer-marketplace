@@ -150,8 +150,25 @@ def test_patch_profile_phone_only(client: TestClient, client_user: User, db_sess
     assert client_user.phone_number == "03129876543"
 
 
+def test_patch_profile_first_name_only(client: TestClient, client_user: User, db_session: Session, mock_supabase):
+    """Test partial profile update changing only first_name without requiring phone_number."""
+    mock_supabase["public"]._current_mock_user_id = str(client_user.id)
+
+    payload = {"first_name": "aaaa"}
+
+    headers = {"Authorization": "Bearer mock_valid_token"}
+    response = client.patch("/users/profile", json=payload, headers=headers)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["first_name"] == "aaaa"
+
+    db_session.refresh(client_user)
+    assert client_user.first_name == "aaaa"
+
+
 def test_patch_profile_first_name_and_phone(client: TestClient, client_user: User, db_session: Session, mock_supabase):
-    """Test partial profile update changing first_name alongside required phone_number."""
+    """Test partial profile update changing first_name alongside phone_number."""
     mock_supabase["public"]._current_mock_user_id = str(client_user.id)
 
     payload = {"first_name": "NewFirst", "phone_number": "03001234567"}

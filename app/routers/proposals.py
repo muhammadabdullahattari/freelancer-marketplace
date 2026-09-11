@@ -15,7 +15,7 @@ from app.core.errors import ResourceNotFoundException
 
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/proposals", tags=["Proposals"])
+router = APIRouter(prefix="/proposals", tags=["Proposals"])
 
 
 @router.post("/", response_model=ProposalResponse, status_code=201)
@@ -30,6 +30,25 @@ def submit_proposal_endpoint(job_id: str,proposal_data: ProposalCreate,current_u
     
     return submit_proposal(db, UUID(job_id), freelancer.id, proposal_data)
 
+
+@router.get("/submitted", response_model=ProposalsListPaginatedResponse)
+def get_my_proposals_endpoint(skip: int = Query(0, ge=0),limit: int = Query(10, ge=1, le=100),
+                                    status: str = Query(None),current_user: User = Depends(get_current_freelancer_user),db: Session = Depends(get_db)):
+    
+    logger.info(f"Listing proposals by freelancer {current_user.id}")
+    freelancer = db.query(FreelancerProfile).filter(FreelancerProfile.user_id == current_user.id).first()
+    
+    if not freelancer:
+        raise ResourceNotFoundException("Freelancer profile")
+    
+    proposals, total = get_freelancer_proposals(db, freelancer.id, status, skip, limit)
+    
+    return {
+        "items": [ProposalResponse.model_validate(p) for p in proposals],
+        "total": total,
+        "skip": skip,
+        "limit": limit
+    }
 
 @router.get("/{proposal_id}", response_model=ProposalResponse)
 def get_proposal_endpoint(proposal_id: str,db: Session = Depends(get_db)):
@@ -82,22 +101,3 @@ def get_job_proposals_endpoint(job_id: str,skip: int = Query(0, ge=0),limit: int
         "limit": limit
     }
 
-
-@router.get("/me/submitted", response_model=ProposalsListPaginatedResponse)
-def get_my_proposals_endpoint(skip: int = Query(0, ge=0),limit: int = Query(10, ge=1, le=100),
-                                    status: str = Query(None),current_user: User = Depends(get_current_freelancer_user),db: Session = Depends(get_db)):
-    
-    logger.info(f"Listing proposals by freelancer {current_user.id}")
-    freelancer = db.query(FreelancerProfile).filter(FreelancerProfile.user_id == current_user.id).first()
-    
-    if not freelancer:
-        raise ResourceNotFoundException("Freelancer profile")
-    
-    proposals, total = get_freelancer_proposals(db, freelancer.id, status, skip, limit)
-    
-    return {
-        "items": [ProposalResponse.model_validate(p) for p in proposals],
-        "total": total,
-        "skip": skip,
-        "limit": limit
-    }

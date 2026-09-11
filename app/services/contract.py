@@ -1,3 +1,4 @@
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException, status
@@ -57,14 +58,50 @@ def add_milestone(db: Session,contract_id: UUID,user_id: UUID,milestone_data: Mi
     if contract.status not in [ContractStatus.ACTIVE, ContractStatus.IN_PROGRESS]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="Contract must be active to add milestones")
     
+    # Extract attributes whether milestone_data is a Pydantic object or dict
+    if isinstance(milestone_data, dict):
+        m_title = milestone_data.get("title")
+        m_description = milestone_data.get("description")
+        m_amount = milestone_data.get("amount", 0.0)
+        m_due_date = milestone_data.get("due_date")
+        m_order = milestone_data.get("order", 1)
+    else:
+        m_title = milestone_data.title
+        m_description = milestone_data.description
+        m_amount = milestone_data.amount
+        m_due_date = milestone_data.due_date
+        m_order = milestone_data.order
+
+    existing_sum = db.query(func.coalesce(func.sum(Milestone.amount), 0.0)).filter(
+        Milestone.contract_id == contract_id
+    ).scalar() or 0.0
+
+    if float(existing_sum) + float(m_amount) > float(contract.total_amount):
+        remaining = max(0.0, float(contract.total_amount) - float(existing_sum))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Milestone amount (${m_amount:.2f}) exceeds remaining contract budget (${remaining:.2f}). Contract total is ${contract.total_amount:.2f}."
+        )
+
+    existing_order = db.query(Milestone).filter(
+        Milestone.contract_id == contract_id,
+        Milestone.order == m_order
+    ).first()
+
+    if existing_order:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"A milestone with order {m_order} already exists for this contract."
+        )
+
     try:
         milestone = Milestone(
             contract_id=contract_id,
-            title=milestone_data.title,
-            description=milestone_data.description,
-            amount=milestone_data.amount,
-            due_date=milestone_data.due_date,
-            order=milestone_data.order)
+            title=m_title,
+            description=m_description,
+            amount=m_amount,
+            due_date=m_due_date,
+            order=m_order)
         
         db.add(milestone)
         db.commit()
@@ -97,6 +134,12 @@ def complete_contract(db: Session,contract_id: UUID,user_id: UUID) -> Contract:
     if pending_milestones:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="All milestones must be completed before closing contract")
     
+    unpaid_milestones = db.query(Milestone).filter(Milestone.contract_id == contract_id,
+                                                   Milestone.status != MilestoneStatus.PAYMENT_RELEASED).first()
+    
+    if unpaid_milestones:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="All milestones must have their payment released before completing the contract.")
+    
     try:
         contract.status = ContractStatus.COMPLETED
         contract.completed_at = datetime.now(timezone.utc)
@@ -120,7 +163,35 @@ def cancel_contract(db: Session,contract_id: UUID,user_id: UUID) -> Contract:
     
     if contract.status == ContractStatus.COMPLETED:
         raise BusinessLogicException(ErrorCode.INVALID_STATE_TRANSITION,"Cannot cancel completed contracts")
-        
+
+    # Require at least one PENDING milestone to cancel the contract
+    pending_milestone = db.query(Milestone).filter(
+        Milestone.contract_id == contract_id,
+        Milestone.status == MilestoneStatus.PENDING
+    ).first()
+
+    if not pending_milestone:
+        raise BusinessLogicException(
+            ErrorCode.INVALID_STATE_TRANSITION,
+            "Cannot cancel contract: at least one pending milestone is required to cancel this contract."
+        )
+
+    active_or_paid_milestones = db.query(Milestone).filter(
+        Milestone.contract_id == contract_id,
+        Milestone.status.in_([
+            MilestoneStatus.SUBMITTED,
+            MilestoneStatus.APPROVED,
+            MilestoneStatus.PAYMENT_RELEASED])).all()
+
+    if active_or_paid_milestones:
+        statuses = {m.status for m in active_or_paid_milestones}
+        if MilestoneStatus.PAYMENT_RELEASED in statuses:
+            raise BusinessLogicException(ErrorCode.INVALID_STATE_TRANSITION,
+                "Cannot cancel a contract with released milestone payments.")
+        else:
+            raise BusinessLogicException(ErrorCode.INVALID_STATE_TRANSITION,
+                "Cannot cancel contract while milestones are submitted or approved. Please resolve active milestones first.")
+    
     try:
         contract.status = ContractStatus.CANCELLED
         contract.deleted_at = datetime.now(timezone.utc)

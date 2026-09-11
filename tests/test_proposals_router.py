@@ -62,3 +62,87 @@ def test_submit_proposal_forbidden_for_client(
 
     response = client.post(f"/api/proposals/?job_id={uuid.uuid4()}", json=payload, headers=headers)
     assert response.status_code == 403
+
+
+def test_accept_proposal_rejects_other_proposals_automatically(db_session, client_user, freelancer_user):
+    """Test that accepting one proposal automatically rejects all other submitted proposals for the same job."""
+    from app.models.job import Job, JobStatus
+    from app.models.freelancer_profile import FreelancerProfile
+    from app.models.proposal import Proposal, ProposalStatus
+    from app.services.proposal import submit_proposal, accept_proposal
+    from app.schemas.proposal import ProposalCreate
+
+    # 1. Create a Job in OPEN status
+    job = Job(
+        id=uuid.uuid4(),
+        client_id=client_user.id,
+        title="Python Multi-Proposal Test Job",
+        description="Testing automatic rejection of remaining proposals when one is accepted.",
+        budget_min=100.0,
+        budget_max=500.0,
+        status=JobStatus.OPEN,
+    )
+    db_session.add(job)
+
+    # 2. Create 2 Freelancer Profiles
+    freelancer1_prof = FreelancerProfile(
+        id=uuid.uuid4(),
+        user_id=freelancer_user.id,
+        bio="Freelancer 1 Bio statement long enough",
+        title="Senior Python Dev 1",
+    )
+    db_session.add(freelancer1_prof)
+
+    user2_id = uuid.uuid4()
+    freelancer_user2 = User(
+        id=user2_id,
+        username="freelanceruser2",
+        name="Freelancer User 2",
+        first_name="Freelancer2",
+        last_name="User2",
+        email="freelancer2@example.com",
+        role="FREELANCER",
+        is_active=True,
+        is_verified=True,
+    )
+    db_session.add(freelancer_user2)
+
+    freelancer2_prof = FreelancerProfile(
+        id=uuid.uuid4(),
+        user_id=user2_id,
+        bio="Freelancer 2 Bio statement long enough",
+        title="Senior Python Dev 2",
+    )
+    db_session.add(freelancer2_prof)
+    db_session.commit()
+
+    # 3. Submit 2 Proposals for the same Job
+    prop_data1 = ProposalCreate(
+        cover_letter="Proposal 1 cover letter text long enough",
+        proposed_rate=200.0,
+        estimated_duration="1 week",
+    )
+    prop1 = submit_proposal(db_session, job.id, freelancer1_prof.id, prop_data1)
+
+    prop_data2 = ProposalCreate(
+        cover_letter="Proposal 2 cover letter text long enough",
+        proposed_rate=250.0,
+        estimated_duration="2 weeks",
+    )
+    prop2 = submit_proposal(db_session, job.id, freelancer2_prof.id, prop_data2)
+
+    assert prop1.status == ProposalStatus.SUBMITTED
+    assert prop2.status == ProposalStatus.SUBMITTED
+
+    # 4. Accept Proposal 1
+    accepted_prop = accept_proposal(db_session, prop1.id, client_user.id)
+
+    # 5. Verify Proposal 1 is ACCEPTED and Proposal 2 is automatically REJECTED
+    db_session.refresh(prop1)
+    db_session.refresh(prop2)
+
+    assert prop1.status == ProposalStatus.ACCEPTED
+    assert prop1.accepted_at is not None
+    assert prop2.status == ProposalStatus.REJECTED
+    assert prop2.rejected_at is not None
+

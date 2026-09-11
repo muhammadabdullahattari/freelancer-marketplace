@@ -10,7 +10,7 @@ from app.models.freelancer_skill import FreelancerSkill
 from app.models.job_skill import JobSkill
     
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/skills", tags=["Skills"])
+router = APIRouter(prefix="/skills", tags=["Skills"])
 
 @router.post("/", response_model=SkillResponse, status_code=201)
 def create_skill_endpoint(skill_data: SkillCreate,db: Session = Depends(get_db)):

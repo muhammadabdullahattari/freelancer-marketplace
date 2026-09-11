@@ -10,7 +10,7 @@ import logging
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/jobs", tags=["Jobs"])
+router = APIRouter(prefix="/jobs", tags=["Jobs"])
 
 
 @router.post("/", response_model=JobResponse, status_code=201)
