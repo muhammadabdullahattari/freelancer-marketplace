@@ -46,7 +46,6 @@ app.include_router(Proposalsrouter)
 app.include_router(Contractsrouter)
 app.include_router(Milestonesrouter)
 app.include_router(Reviewsrouter)
-app.include_router(Sessionsrouter)
 app.include_router(Uploadsrouter)
 
 @app.get("/")

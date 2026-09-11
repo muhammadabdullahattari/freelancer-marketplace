@@ -21,16 +21,29 @@ def create_review(db: Session,contract_id: UUID,reviewer_user_id: UUID,review_da
     if contract.status != ContractStatus.COMPLETED:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="Can only review completed contracts")
     
-    if contract.client_id != reviewer_user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,detail="Only contract client can submit reviews")
+    is_client = (contract.client_id == reviewer_user_id)
+    is_freelancer = (contract.freelancer and contract.freelancer.user_id == reviewer_user_id)
+    
+    if not (is_client or is_freelancer):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,detail="Only the client or freelancer assigned to this contract can submit reviews")
     
     existing = db.query(Review).filter(Review.contract_id == contract_id,Review.reviewer_id == reviewer_user_id).first()
     
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT,detail="You have already reviewed this contract")
     
-    rating = review_data.rating
-    if not rating or rating < 1 or rating > 5:
+    if isinstance(review_data, dict):
+        r_rating = review_data.get("rating")
+        r_title = review_data.get("title")
+        r_comment = review_data.get("comment")
+        r_is_anonymous = review_data.get("is_anonymous", False)
+    else:
+        r_rating = review_data.rating
+        r_title = review_data.title
+        r_comment = review_data.comment
+        r_is_anonymous = review_data.is_anonymous
+
+    if not r_rating or r_rating < 1 or r_rating > 5:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Rating must be between 1 and 5")
     
     try:
@@ -38,16 +51,17 @@ def create_review(db: Session,contract_id: UUID,reviewer_user_id: UUID,review_da
             contract_id=contract_id,
             reviewer_id=reviewer_user_id,
             freelancer_id=contract.freelancer_id,
-            rating = review_data.rating,
-            title = review_data.title,
-            comment = review_data.comment,
-            is_anonymous = review_data.is_anonymous
+            rating=r_rating,
+            title=r_title,
+            comment=r_comment,
+            is_anonymous=r_is_anonymous
         )
         
         db.add(review)
         db.flush()
         
-        update_freelancer_rating(db, contract.freelancer_id)
+        if is_client:
+            update_freelancer_rating(db, contract.freelancer_id)
         
         db.commit()
         db.refresh(review)

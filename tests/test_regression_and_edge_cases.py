@@ -59,7 +59,7 @@ def test_cannot_review_active_or_in_progress_contract(
     mock_supabase["public"]._current_mock_user_id = str(client_user.id)
     c_headers = {"Authorization": "Bearer mock_client_token"}
     res = client.post(
-        f"/api/reviews/?contract_id={contract.id}",
+        f"/reviews/?contract_id={contract.id}",
         json={"rating": 5, "title": "Premature Review"},
         headers=c_headers,
     )
@@ -73,7 +73,7 @@ def test_invalid_rating_boundary_validation(
     mock_supabase["public"]._current_mock_user_id = str(client_user.id)
     c_headers = {"Authorization": "Bearer mock_client_token"}
     res = client.post(
-        f"/api/reviews/?contract_id={uuid.uuid4()}",
+        f"/reviews/?contract_id={uuid.uuid4()}",
         json={"rating": 10, "title": "Invalid Rating 10"},
         headers=c_headers,
     )

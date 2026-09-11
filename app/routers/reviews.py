@@ -21,26 +21,6 @@ def create_review_endpoint(contract_id: str,review_data: ReviewCreate,current_us
     logger.info(f"User {current_user.id} creating review for contract {contract_id}")
     return create_review(db, UUID(contract_id), current_user.id, review_data)
 
-# @router.get("/{review_id}", response_model=ReviewResponse)
-# def get_review_endpoint(review_id: str,db: Session = Depends(get_db)):
-    
-#     logger.info(f"Fetching review: {review_id}")
-#     return get_review(db, UUID(review_id))
-
-# @router.get("/freelancer/{freelancer_id}", response_model=ReviewsListPaginatedResponse)
-# def get_freelancer_reviews_endpoint(freelancer_id: str,skip: int = Query(0, ge=0),
-#                                           limit: int = Query(10, ge=1, le=100),db: Session = Depends(get_db)):
-    
-#     logger.info(f"Fetching reviews for freelancer {freelancer_id}")
-#     reviews, total = get_freelancer_reviews(db, UUID(freelancer_id), skip, limit)
-    
-#     return {
-#         "items": [ReviewResponse.model_validate(r) for r in reviews],
-#         "total": total,
-#         "skip": skip,
-#         "limit": limit
-#     }
-
 
 @router.get("/contract/{contract_id}", response_model=list[ReviewResponse])
 def get_contract_reviews_endpoint(contract_id: str,db: Session = Depends(get_db)):
