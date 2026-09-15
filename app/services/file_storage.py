@@ -17,12 +17,10 @@ logger = logging.getLogger(__name__)
 
 
 def sanitize_filename(filename: str) -> str:
-    """Remove special characters and prevent path traversal"""
-    # Remove anything that's not alphanumeric, underscore, hyphen, or dot
+
     sanitized = re.sub(r'[^a-zA-Z0-9._-]', '_', filename)
-    # Prevent path traversal
     sanitized = sanitized.replace('..', '_').replace('/', '_').replace('\\', '_')
-    # Limit length
+
     return sanitized[:100]
 
 

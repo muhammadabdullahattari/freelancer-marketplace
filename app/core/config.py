@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     ALLOWED_DOCUMENT_TYPES: list[str] = ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
     ALLOWED_FILE_TYPES: list[str] = ["application/pdf", "application/zip", "image/jpeg", "image/png"]
     
-    SUPABASE_STORAGE_BUCKET_PROFILES: str = "profile-pictures"
+    SUPABASE_STORAGE_BUCKET_PROFILES: str = "profile_pictures"
     SUPABASE_STORAGE_BUCKET_PROPOSALS: str = "proposal-attachments"
     SUPABASE_STORAGE_BUCKET_CONTRACTS: str = "contract-documents"
     SUPABASE_STORAGE_BUCKET_MILESTONES: str = "milestone-deliverables"
