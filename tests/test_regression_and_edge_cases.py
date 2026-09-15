@@ -16,7 +16,7 @@ def test_cannot_submit_proposal_to_closed_job(client: TestClient, client_user: U
     db_session.commit()
     mock_supabase['public']._current_mock_user_id = str(freelancer_user.id)
     f_headers = {'Authorization': 'Bearer mock_freelancer_token'}
-    res = client.post(f'/api/proposals/?job_id={closed_job.id}', json={'cover_letter': 'Cover letter for closed job submission', 'proposed_rate': 500.0}, headers=f_headers)
+    res = client.post(f'/proposals/?job_id={closed_job.id}', json={'cover_letter': 'Cover letter for closed job submission', 'proposed_rate': 500.0}, headers=f_headers)
     assert res.status_code == 400
 
 def test_cannot_review_active_or_in_progress_contract(client: TestClient, client_user: User, freelancer_user: User, mock_supabase, db_session):
@@ -56,7 +56,7 @@ def test_unassigned_client_cannot_release_milestone_payment(client: TestClient, 
     db_session.commit()
     mock_supabase['public']._current_mock_user_id = str(other_client.id)
     other_headers = {'Authorization': 'Bearer mock_other_client_token'}
-    res = client.post(f'/api/milestones/{milestone.id}/release-payment', headers=other_headers)
+    res = client.post(f'/milestones/{milestone.id}/release-payment', headers=other_headers)
     assert res.status_code == 403
 
 def test_unassigned_freelancer_cannot_submit_milestone(client: TestClient, client_user: User, freelancer_user: User, mock_supabase, db_session):
@@ -76,5 +76,5 @@ def test_unassigned_freelancer_cannot_submit_milestone(client: TestClient, clien
     db_session.commit()
     mock_supabase['public']._current_mock_user_id = str(other_freelancer.id)
     other_f_headers = {'Authorization': 'Bearer mock_other_freelancer_token'}
-    res = client.post(f'/api/milestones/{milestone.id}/submit', headers=other_f_headers)
+    res = client.post(f'/milestones/{milestone.id}/submit', headers=other_f_headers)
     assert res.status_code == 403

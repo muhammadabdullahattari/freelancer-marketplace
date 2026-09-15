@@ -1,22 +1,30 @@
-from sqlalchemy import func
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
+import logging
+from datetime import datetime, timezone
+from uuid import UUID
+
 from fastapi import HTTPException, status
+from sqlalchemy import func
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
+
+from app.core.errors import (
+    AuthorizationException,
+    BusinessLogicException,
+    ErrorCode,
+    ResourceNotFoundException,
+)
+from app.models.base import SoftDeleteMixin
 from app.models.contract import Contract, ContractStatus
-from app.models.proposal import Proposal
 from app.models.job import Job
 from app.models.milestone import Milestone, MilestoneStatus
-from uuid import UUID
-from datetime import datetime, timezone
+from app.models.proposal import Proposal
 from app.schemas.milestone import MilestoneCreate
-import logging
-from app.models.base import SoftDeleteMixin
-from app.core.errors import BusinessLogicException, AuthorizationException,ResourceNotFoundException,ErrorCode
+from app.services.file_storage import FileStorageService
 
 logger = logging.getLogger(__name__)
 
+
 def create_contract_from_proposal(db: Session, proposal: Proposal) -> Contract:
-    
     try:
         contract = Contract(
             job_id=proposal.job_id,
@@ -37,7 +45,8 @@ def create_contract_from_proposal(db: Session, proposal: Proposal) -> Contract:
         
     except SQLAlchemyError as e:
         logger.error(f"Contract creation failed: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail="Failed to create contract")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create contract")
+
 
 def get_contract(db: Session, contract_id: UUID) -> Contract:
     contract = db.query(Contract).filter(Contract.id == contract_id, Contract.deleted_at == None).first()
@@ -48,17 +57,15 @@ def get_contract(db: Session, contract_id: UUID) -> Contract:
     return contract
 
 
-def add_milestone(db: Session,contract_id: UUID,user_id: UUID,milestone_data: MilestoneCreate) -> Milestone:
-    
+def add_milestone(db: Session, contract_id: UUID, user_id: UUID, milestone_data: MilestoneCreate) -> Milestone:
     contract = get_contract(db, contract_id)
     
     if contract.client_id != user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,detail="Only client can add milestones")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only client can add milestones")
     
     if contract.status not in [ContractStatus.ACTIVE, ContractStatus.IN_PROGRESS]:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="Contract must be active to add milestones")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Contract must be active to add milestones")
     
-    # Extract attributes whether milestone_data is a Pydantic object or dict
     if isinstance(milestone_data, dict):
         m_title = milestone_data.get("title")
         m_description = milestone_data.get("description")
@@ -101,7 +108,8 @@ def add_milestone(db: Session,contract_id: UUID,user_id: UUID,milestone_data: Mi
             description=m_description,
             amount=m_amount,
             due_date=m_due_date,
-            order=m_order)
+            order=m_order
+        )
         
         db.add(milestone)
         db.commit()
@@ -112,33 +120,38 @@ def add_milestone(db: Session,contract_id: UUID,user_id: UUID,milestone_data: Mi
     except SQLAlchemyError as e:
         db.rollback()
         logger.error(f"Milestone creation failed: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail="Failed to add milestone")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to add milestone")
+
 
 def get_contract_milestones(db: Session, contract_id: UUID) -> list[Milestone]:
     contract = get_contract(db, contract_id)
     return db.query(Milestone).filter(Milestone.contract_id == contract_id).order_by(Milestone.order).all()
 
-def complete_contract(db: Session,contract_id: UUID,user_id: UUID) -> Contract:
-    
+
+def complete_contract(db: Session, contract_id: UUID, user_id: UUID) -> Contract:
     contract = get_contract(db, contract_id)
     
     if contract.client_id != user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,detail="Only client can complete contract")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only client can complete contract")
     
     if contract.status != ContractStatus.IN_PROGRESS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Contract must be IN_PROGRESS to complete")
     
-    pending_milestones = db.query(Milestone).filter(Milestone.contract_id == contract_id,
-                        Milestone.status.notin_([MilestoneStatus.APPROVED, MilestoneStatus.PAYMENT_RELEASED])).first()
+    pending_milestones = db.query(Milestone).filter(
+        Milestone.contract_id == contract_id,
+        Milestone.status.notin_([MilestoneStatus.APPROVED, MilestoneStatus.PAYMENT_RELEASED])
+    ).first()
     
     if pending_milestones:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="All milestones must be completed before closing contract")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="All milestones must be completed before closing contract")
     
-    unpaid_milestones = db.query(Milestone).filter(Milestone.contract_id == contract_id,
-                                                   Milestone.status != MilestoneStatus.PAYMENT_RELEASED).first()
+    unpaid_milestones = db.query(Milestone).filter(
+        Milestone.contract_id == contract_id,
+        Milestone.status != MilestoneStatus.PAYMENT_RELEASED
+    ).first()
     
     if unpaid_milestones:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="All milestones must have their payment released before completing the contract.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="All milestones must have their payment released before completing the contract.")
     
     try:
         contract.status = ContractStatus.COMPLETED
@@ -151,20 +164,18 @@ def complete_contract(db: Session,contract_id: UUID,user_id: UUID) -> Contract:
     except SQLAlchemyError as e:
         db.rollback()
         logger.error(f"Contract completion failed: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail="Failed to complete contract")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to complete contract")
 
 
-def cancel_contract(db: Session,contract_id: UUID,user_id: UUID) -> Contract:
-    
+def cancel_contract(db: Session, contract_id: UUID, user_id: UUID) -> Contract:
     contract = get_contract(db, contract_id)
     
     if contract.client_id != user_id and contract.freelancer.user_id != user_id:
         raise AuthorizationException("Not authorized to cancel this contract")
     
     if contract.status == ContractStatus.COMPLETED:
-        raise BusinessLogicException(ErrorCode.INVALID_STATE_TRANSITION,"Cannot cancel completed contracts")
+        raise BusinessLogicException(ErrorCode.INVALID_STATE_TRANSITION, "Cannot cancel completed contracts")
 
-    # Require at least one PENDING milestone to cancel the contract
     pending_milestone = db.query(Milestone).filter(
         Milestone.contract_id == contract_id,
         Milestone.status == MilestoneStatus.PENDING
@@ -181,18 +192,25 @@ def cancel_contract(db: Session,contract_id: UUID,user_id: UUID) -> Contract:
         Milestone.status.in_([
             MilestoneStatus.SUBMITTED,
             MilestoneStatus.APPROVED,
-            MilestoneStatus.PAYMENT_RELEASED])).all()
+            MilestoneStatus.PAYMENT_RELEASED
+        ])
+    ).all()
 
     if active_or_paid_milestones:
         statuses = {m.status for m in active_or_paid_milestones}
         if MilestoneStatus.PAYMENT_RELEASED in statuses:
-            raise BusinessLogicException(ErrorCode.INVALID_STATE_TRANSITION,
-                "Cannot cancel a contract with released milestone payments.")
+            raise BusinessLogicException(
+                ErrorCode.INVALID_STATE_TRANSITION,
+                "Cannot cancel a contract with released milestone payments."
+            )
         else:
-            raise BusinessLogicException(ErrorCode.INVALID_STATE_TRANSITION,
-                "Cannot cancel contract while milestones are submitted or approved. Please resolve active milestones first.")
+            raise BusinessLogicException(
+                ErrorCode.INVALID_STATE_TRANSITION,
+                "Cannot cancel contract while milestones are submitted or approved. Please resolve active milestones first."
+            )
     
     try:
+        FileStorageService.cleanup_resource_files(db, "contract", contract_id)
         contract.status = ContractStatus.CANCELLED
         contract.deleted_at = datetime.now(timezone.utc)
         db.commit()
@@ -203,17 +221,23 @@ def cancel_contract(db: Session,contract_id: UUID,user_id: UUID) -> Contract:
     except SQLAlchemyError as e:
         db.rollback()
         logger.error(f"Contract cancellation failed: {str(e)}")
-        raise BusinessLogicException(ErrorCode.INTERNAL_ERROR,"Failed to cancel contract")
+        raise BusinessLogicException(ErrorCode.INTERNAL_ERROR, "Failed to cancel contract")
 
-def get_user_contracts(db: Session,user_id: UUID,role: str, status_filter: str | None = None,skip: int = 0,
-                       limit: int = 10) -> tuple[list[Contract], int]:
-    
+
+def get_user_contracts(
+    db: Session,
+    user_id: UUID,
+    role: str,
+    status_filter: str | None = None,
+    skip: int = 0,
+    limit: int = 10
+) -> tuple[list[Contract], int]:
     if role == "CLIENT":
         query = db.query(Contract).filter(Contract.client_id == user_id, Contract.deleted_at == None)
     elif role == "FREELANCER":
         query = db.query(Contract).filter(Contract.freelancer.has(user_id=user_id), Contract.deleted_at == None)
     else:
-        raise BusinessLogicException(ErrorCode.INVALID_INPUT,"Invalid role")
+        raise BusinessLogicException(ErrorCode.INVALID_INPUT, "Invalid role")
     
     if status_filter:
         query = query.filter(Contract.status == status_filter)

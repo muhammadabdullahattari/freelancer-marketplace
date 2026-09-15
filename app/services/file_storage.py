@@ -1,15 +1,30 @@
-from fastapi import UploadFile, HTTPException, status
-from sqlalchemy.orm import Session
-from app.core.supabase_client import supabase_service
-from app.core.file_config import FileConfig, FileType
-from app.models.file_upload import FileUpload
-from app.core.errors import ValidationException, BusinessLogicException, ErrorCode
-from uuid import UUID
 import logging
 import os
+import re
+import uuid
 from datetime import datetime, timezone
+from uuid import UUID
+
+from fastapi import HTTPException, UploadFile, status
+from sqlalchemy.orm import Session
+
+from app.core.errors import BusinessLogicException, ErrorCode, ValidationException
+from app.core.file_config import FileConfig, FileType
+from app.core.supabase_client import supabase_service
+from app.models.file_upload import FileUpload
 
 logger = logging.getLogger(__name__)
+
+
+def sanitize_filename(filename: str) -> str:
+    """Remove special characters and prevent path traversal"""
+    # Remove anything that's not alphanumeric, underscore, hyphen, or dot
+    sanitized = re.sub(r'[^a-zA-Z0-9._-]', '_', filename)
+    # Prevent path traversal
+    sanitized = sanitized.replace('..', '_').replace('/', '_').replace('\\', '_')
+    # Limit length
+    return sanitized[:100]
+
 
 class FileStorageService:
     
@@ -47,13 +62,15 @@ class FileStorageService:
                 )
             
             timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-            filename_without_ext = os.path.splitext(file.filename)[0]
-            file_ext = os.path.splitext(file.filename)[1]
-            unique_filename = f"{config['folder']}/{timestamp}_{filename_without_ext}_{UUID(int=id(file_content))}{file_ext}"
+            filename_without_ext = os.path.splitext(file.filename)[0] if file.filename else "file"
+            file_ext = os.path.splitext(file.filename)[1] if file.filename else ""
+            
+            safe_filename = sanitize_filename(filename_without_ext)
+            unique_filename = f"{config['folder']}/{timestamp}_{safe_filename}_{uuid.uuid4()}{file_ext}"
             
             bucket_name = config["bucket"]
             
-            response = supabase_service.storage.from_(bucket_name).upload(
+            supabase_service.storage.from_(bucket_name).upload(
                 path=unique_filename,
                 file=file_content,
                 file_options={"content-type": mime_type}
@@ -64,15 +81,15 @@ class FileStorageService:
             if config["is_public"]:
                 storage_url = supabase_service.storage.from_(bucket_name).get_public_url(unique_filename)
             else:
-                storage_url = supabase_service.storage.from_(bucket_name).create_signed_url(
+                storage_url_res = supabase_service.storage.from_(bucket_name).create_signed_url(
                     path=unique_filename,
                     expires_in=7 * 24 * 60 * 60  # 7 days
                 )
-                storage_url = storage_url["signedURL"] if isinstance(storage_url, dict) else storage_url
+                storage_url = storage_url_res["signedURL"] if isinstance(storage_url_res, dict) else storage_url_res
             
             file_upload = FileUpload(
                 filename=unique_filename,
-                original_filename=file.filename,
+                original_filename=file.filename or safe_filename,
                 file_type=file_type.value,
                 mime_type=mime_type,
                 file_size_bytes=file_size_bytes,
@@ -87,15 +104,31 @@ class FileStorageService:
                 milestone_id=milestone_id
             )
             
-            db.add(file_upload)
-            db.commit()
-            db.refresh(file_upload)
-            
-            logger.info(f"File record created in DB: {file_upload.id}")
-            
-            return file_upload
+            try:
+                db.add(file_upload)
+                db.commit()
+                db.refresh(file_upload)
+                
+                logger.info(f"File record created in DB: {file_upload.id}")
+                return file_upload
+                
+            except Exception as db_error:
+                db.rollback()
+                logger.error(f"DB commit failed: {str(db_error)}, cleaning up storage...")
+                try:
+                    supabase_service.storage.from_(bucket_name).remove([unique_filename])
+                    logger.info(f"Cleaned up orphaned file from storage: {unique_filename}")
+                except Exception as cleanup_error:
+                    logger.error(f"Failed to cleanup storage file: {str(cleanup_error)}")
+                
+                raise BusinessLogicException(
+                    ErrorCode.INTERNAL_ERROR,
+                    f"Failed to save file metadata: {str(db_error)}"
+                )
             
         except ValidationException:
+            raise
+        except BusinessLogicException:
             raise
         except Exception as e:
             logger.error(f"File upload failed: {str(e)}")
@@ -152,3 +185,38 @@ class FileStorageService:
                 ErrorCode.INTERNAL_ERROR,
                 "Failed to generate download URL"
             )
+            
+    @staticmethod
+    def cleanup_resource_files(db: Session, resource_type: str, resource_id: UUID) -> int:
+        """Clean up files associated with a resource"""
+        try:
+            if resource_type == "job":
+                files = db.query(FileUpload).filter(FileUpload.job_id == resource_id, FileUpload.deleted_at == None).all()
+            elif resource_type == "proposal":
+                files = db.query(FileUpload).filter(FileUpload.proposal_id == resource_id, FileUpload.deleted_at == None).all()
+            elif resource_type == "contract":
+                files = db.query(FileUpload).filter(FileUpload.contract_id == resource_id, FileUpload.deleted_at == None).all()
+            elif resource_type == "milestone":
+                files = db.query(FileUpload).filter(FileUpload.milestone_id == resource_id, FileUpload.deleted_at == None).all()
+            else:
+                return 0
+            
+            deleted_count = 0
+            
+            for file in files:
+                try:
+                    supabase_service.storage.from_(file.storage_bucket).remove([file.storage_path])
+                    file.deleted_at = datetime.now(timezone.utc)
+                    deleted_count += 1
+                    logger.info(f"Deleted file {file.id} from {resource_type} {resource_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to delete file {file.id}: {str(e)}")
+                    continue
+            
+            db.commit()
+            logger.info(f"Cleaned up {deleted_count} files for {resource_type} {resource_id}")
+            return deleted_count
+            
+        except Exception as e:
+            logger.error(f"Resource file cleanup failed: {str(e)}")
+            return 0

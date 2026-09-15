@@ -9,6 +9,7 @@ from app.schemas.job import JobCreate,JobUpdate
 from uuid import UUID
 from datetime import datetime, timezone
 import logging
+from app.services.file_storage import FileStorageService
 from app.core.errors import BusinessLogicException, ErrorCode
 from app.core.errors import BusinessLogicException, ErrorCode, ResourceNotFoundException, AuthorizationException
 
@@ -183,12 +184,11 @@ def get_jobs_list(db: Session, skip: int = 0, limit: int = 10, status_filter: st
     jobs = query.all()
     
     return jobs, total
-
-
-def delete_job(db: Session, job_id: UUID, client_id: UUID) -> None:
-
+    
+async def delete_job(db: Session, job_id: UUID, client_id: UUID) -> None:
+    
     job = get_job(db, job_id)
-
+    
     if job.client_id != client_id:
         raise AuthorizationException("Not authorized to delete this job")
     
@@ -196,6 +196,8 @@ def delete_job(db: Session, job_id: UUID, client_id: UUID) -> None:
         raise BusinessLogicException(ErrorCode.INVALID_STATE_TRANSITION,"Only DRAFT jobs can be deleted")
     
     try:
+        await FileStorageService.cleanup_resource_files(db, "job", job_id)
+        
         job.deleted_at = datetime.now(timezone.utc)
         db.commit()
         logger.info(f"Job deleted: {job_id}")

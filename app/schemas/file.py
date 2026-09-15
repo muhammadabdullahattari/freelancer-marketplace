@@ -11,7 +11,6 @@ class FileUploadResponse(BaseModel):
     file_type: str
     mime_type: str
     file_size_bytes: int
-    storage_url: Optional[str]
     is_public: bool
     created_at: datetime
     
@@ -36,7 +35,6 @@ class ProposalAttachmentResponse(BaseModel):
     original_filename: str
     file_size_bytes: int
     mime_type: str
-    url: Optional[str]
     created_at: datetime
     
     class Config:
@@ -49,7 +47,6 @@ class ContractDocumentResponse(BaseModel):
     original_filename: str
     file_size_bytes: int
     mime_type: str
-    url: Optional[str]
     created_at: datetime
     
     class Config:
@@ -62,7 +59,6 @@ class MilestoneDeliverableResponse(BaseModel):
     original_filename: str
     file_size_bytes: int
     mime_type: str
-    url: Optional[str]
     created_at: datetime
     
     class Config:

@@ -10,20 +10,20 @@ def test_submit_proposal_flow_and_type_check(client: TestClient, client_user: Us
     db_session.commit()
     mock_supabase['public']._current_mock_user_id = str(client_user.id)
     c_headers = {'Authorization': 'Bearer mock_client_token'}
-    job_res = client.post('/api/jobs/', json={'title': 'Open Job For Proposals Submission', 'description': 'Long detailed description for testing proposal submissions on open jobs.', 'budget_max': 1500.0}, headers=c_headers)
+    job_res = client.post('/jobs/', json={'title': 'Open Job For Proposals Submission', 'description': 'Long detailed description for testing proposal submissions on open jobs.', 'budget_max': 1500.0}, headers=c_headers)
     job_id = job_res.json()['id']
-    client.post(f'/api/jobs/{job_id}/publish', headers=c_headers)
+    client.post(f'/jobs/{job_id}/publish', headers=c_headers)
     mock_supabase['public']._current_mock_user_id = str(freelancer_user.id)
     f_headers = {'Authorization': 'Bearer mock_freelancer_token'}
     prop_payload = {'cover_letter': 'I am very interested in working on this full-stack application.', 'proposed_rate': 1200.0, 'estimated_duration': '2 weeks'}
-    response = client.post(f'/api/proposals/?job_id={job_id}', json=prop_payload, headers=f_headers)
+    response = client.post(f'/proposals/?job_id={job_id}', json=prop_payload, headers=f_headers)
     assert response.status_code in [201, 500, 422]
 
 def test_submit_proposal_forbidden_for_client(client: TestClient, client_user: User, mock_supabase):
     mock_supabase['public']._current_mock_user_id = str(client_user.id)
     headers = {'Authorization': 'Bearer mock_client_token'}
     payload = {'cover_letter': 'Client trying to submit proposal should be forbidden.', 'proposed_rate': 500.0}
-    response = client.post(f'/api/proposals/?job_id={uuid.uuid4()}', json=payload, headers=headers)
+    response = client.post(f'/proposals/?job_id={uuid.uuid4()}', json=payload, headers=headers)
     assert response.status_code == 403
 
 def test_accept_proposal_rejects_other_proposals_automatically(db_session, client_user, freelancer_user):
