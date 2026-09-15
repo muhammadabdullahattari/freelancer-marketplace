@@ -17,10 +17,12 @@ logger = logging.getLogger(__name__)
 
 
 def sanitize_filename(filename: str) -> str:
-
+    """Remove special characters and prevent path traversal"""
+    # Remove anything that's not alphanumeric, underscore, hyphen, or dot
     sanitized = re.sub(r'[^a-zA-Z0-9._-]', '_', filename)
+    # Prevent path traversal
     sanitized = sanitized.replace('..', '_').replace('/', '_').replace('\\', '_')
-
+    # Limit length
     return sanitized[:100]
 
 
@@ -66,13 +68,38 @@ class FileStorageService:
             safe_filename = sanitize_filename(filename_without_ext)
             unique_filename = f"{config['folder']}/{timestamp}_{safe_filename}_{uuid.uuid4()}{file_ext}"
             
-            bucket_name = config["bucket"]
+            bucket_name = config["bucket"].strip("'\" ")
             
-            supabase_service.storage.from_(bucket_name).upload(
-                path=unique_filename,
-                file=file_content,
-                file_options={"content-type": mime_type}
-            )
+            try:
+                response = supabase_service.storage.from_(bucket_name).upload(
+                    path=unique_filename,
+                    file=file_content,
+                    file_options={"content-type": mime_type}
+                )
+            except Exception as upload_err:
+                err_str = str(upload_err)
+                if "Bucket not found" in err_str or "404" in err_str:
+                    alt_bucket = bucket_name.replace("-", "_") if "-" in bucket_name else bucket_name.replace("_", "-")
+                    logger.warning(f"Bucket '{bucket_name}' not found. Trying alternative bucket '{alt_bucket}' or auto-creation...")
+                    try:
+                        response = supabase_service.storage.from_(alt_bucket).upload(
+                            path=unique_filename,
+                            file=file_content,
+                            file_options={"content-type": mime_type}
+                        )
+                        bucket_name = alt_bucket
+                    except Exception:
+                        try:
+                            supabase_service.storage.create_bucket(bucket_name, options={"public": config["is_public"]})
+                            response = supabase_service.storage.from_(bucket_name).upload(
+                                path=unique_filename,
+                                file=file_content,
+                                file_options={"content-type": mime_type}
+                            )
+                        except Exception:
+                            raise upload_err
+                else:
+                    raise upload_err
             
             logger.info(f"File uploaded to Supabase Storage: {bucket_name}/{unique_filename}")
             
