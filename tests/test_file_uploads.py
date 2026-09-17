@@ -300,3 +300,40 @@ def test_invalid_uuid_format_handling(client: TestClient, freelancer_user: User,
     for url in endpoints_get:
         res = client.get(url, headers=headers)
         assert res.status_code == 422, f'Expected 422 for {url}, got {res.status_code}'
+
+def test_upload_profile_picture_duplicate_fails(client: TestClient, freelancer_user: User, mock_supabase):
+    headers = get_auth_headers(freelancer_user, mock_supabase)
+    files = {'file': ('avatar1.jpg', b'fake jpeg image content', 'image/jpeg')}
+    res1 = client.post('/uploads/profile-picture', headers=headers, files=files)
+    assert res1.status_code == 201
+    
+    files2 = {'file': ('avatar2.jpg', b'fake jpeg image content 2', 'image/jpeg')}
+    res2 = client.post('/uploads/profile-picture', headers=headers, files=files2)
+    assert res2.status_code == 400
+    assert 'Profile picture already exists' in res2.json()['error']['message']
+
+def test_delete_profile_picture_repeatedly_returns_404(client: TestClient, freelancer_user: User, mock_supabase):
+    headers = get_auth_headers(freelancer_user, mock_supabase)
+    files = {'file': ('avatar.jpg', b'fake content', 'image/jpeg')}
+    upload_res = client.post('/uploads/profile-picture', headers=headers, files=files)
+    file_id = upload_res.json()['id']
+    
+    del_res1 = client.delete(f'/uploads/profile-picture/{file_id}', headers=headers)
+    assert del_res1.status_code == 204
+    
+    del_res2 = client.delete(f'/uploads/profile-picture/{file_id}', headers=headers)
+    assert del_res2.status_code == 404
+    assert 'Profile picture not found' in del_res2.json()['error']['message']
+
+def test_delete_proposal_attachment_repeatedly_returns_404(client: TestClient, freelancer_user: User, sample_proposal: Proposal, mock_supabase):
+    headers = get_auth_headers(freelancer_user, mock_supabase)
+    files = {'file': ('doc.pdf', b'pdf content', 'application/pdf')}
+    upload_res = client.post(f'/uploads/proposal/{sample_proposal.id}/attachment', headers=headers, files=files)
+    file_id = upload_res.json()['id']
+    
+    del_res1 = client.delete(f'/uploads/proposal/attachment/{file_id}', headers=headers)
+    assert del_res1.status_code == 204
+    
+    del_res2 = client.delete(f'/uploads/proposal/attachment/{file_id}', headers=headers)
+    assert del_res2.status_code == 404
+    assert 'Attachment not found' in del_res2.json()['error']['message']

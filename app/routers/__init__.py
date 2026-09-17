@@ -9,6 +9,7 @@ from .reviews import router as reviews_router
 from .skills import router as skills_router
 from .sessions import router as Sessions_router
 from .uploads import router as Uploads_router
+from .notifications import router as Notification_router
 
 __all__ = [
     "auth_router",
@@ -21,5 +22,6 @@ __all__ = [
     "reviews_router",
     "skills_router",
     "Sessions_router",
-    "Uploads_router"
+    "Uploads_router",
+    "Notification_router"
 ]

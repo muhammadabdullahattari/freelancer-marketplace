@@ -27,7 +27,27 @@ class Settings(BaseSettings):
     SUPABASE_STORAGE_BUCKET_CONTRACTS: str = "contract-documents"
     SUPABASE_STORAGE_BUCKET_MILESTONES: str = "milestone-deliverables"
     
+    REDIS_URL: str = "redis://localhost:6379/0"
+
+    CELERY_BROKER_URL: str = "redis://localhost:6379/0"
+    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/1"
+    CELERY_TASK_SERIALIZER: str = "json"
+    CELERY_ACCEPT_CONTENT: str = "json"
+    CELERY_RESULT_SERIALIZER: str = "json"
+    CELERY_TIMEZONE: str = "UTC"
     
+    NOTIFICATION_MAX_RETRIES: int = 3
+    NOTIFICATION_RETRY_DELAY_SECONDS: int = 5  # Start at 5 seconds, exponential backoff
+    NOTIFICATION_ENABLE_DELIVERY_TRACKING: bool = True
+    NOTIFICATION_EMAIL_FROM: str = "noreply@marketplace.com"
+    NOTIFICATION_EMAIL_FROM_NAME: str = "Freelancer Marketplace"
+
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_USER: str | None = None
+    SMTP_PASSWORD: str | None = None
+    SMTP_TLS: bool = True
+
     model_config = SettingsConfigDict(env_file=".env",extra="ignore")
 
 

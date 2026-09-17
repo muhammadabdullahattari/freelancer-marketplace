@@ -41,6 +41,56 @@ def create_contract_from_proposal(db: Session, proposal: Proposal) -> Contract:
         db.add(contract)
         db.flush()
         logger.info(f"Contract created: {contract.id} from proposal: {proposal.id}")
+
+        # Queue notifications to both client and freelancer
+        try:
+            from app.services.notification import NotificationService
+            from app.models.notifications import NotificationEventType
+            from app.models.users import User
+            
+            client_user = db.query(User).filter(User.id == contract.client_id).first()
+            freelancer_user = db.query(User).filter(User.id == contract.freelancer.user_id).first()
+            job_title = contract.job.title if contract.job else contract.title
+            
+            if client_user and freelancer_user:
+                # Notify client
+                NotificationService.queue_notification(
+                    db=db,
+                    event_type=NotificationEventType.CONTRACT_CREATED.value,
+                    recipient_user_id=client_user.id,
+                    email_subject=f"Contract Created for {job_title}",
+                    email_body_html=f"""
+                        <html><body>
+                            <h2>Contract Created!</h2>
+                            <p>Hi {client_user.name},</p>
+                            <p>A contract has been created for your job: {job_title}.</p>
+                        </body></html>
+                    """,
+                    resource_type="contract",
+                    resource_id=contract.id,
+                    triggered_by_user_id=freelancer_user.id
+                )
+                
+                # Notify freelancer
+                NotificationService.queue_notification(
+                    db=db,
+                    event_type=NotificationEventType.CONTRACT_CREATED.value,
+                    recipient_user_id=freelancer_user.id,
+                    email_subject=f"Contract Created for {job_title}",
+                    email_body_html=f"""
+                        <html><body>
+                            <h2>Contract Created!</h2>
+                            <p>Hi {freelancer_user.name},</p>
+                            <p>A contract has been created for job: {job_title}.</p>
+                        </body></html>
+                    """,
+                    resource_type="contract",
+                    resource_id=contract.id,
+                    triggered_by_user_id=client_user.id
+                )
+        except Exception as e:
+            logger.error(f"Failed to queue contract notification: {str(e)}")
+
         return contract
         
     except SQLAlchemyError as e:
@@ -159,6 +209,53 @@ def complete_contract(db: Session, contract_id: UUID, user_id: UUID) -> Contract
         db.commit()
         db.refresh(contract)
         logger.info(f"Contract completed: {contract_id}")
+
+        # Queue notifications to both parties
+        try:
+            from app.services.notification import NotificationService
+            from app.models.notifications import NotificationEventType
+            from app.models.users import User
+            
+            client_user = db.query(User).filter(User.id == contract.client_id).first()
+            freelancer_user = db.query(User).filter(User.id == contract.freelancer.user_id).first()
+            job_title = contract.job.title if contract.job else contract.title
+            
+            if client_user:
+                NotificationService.queue_notification(
+                    db=db,
+                    event_type=NotificationEventType.CONTRACT_COMPLETED.value,
+                    recipient_user_id=client_user.id,
+                    email_subject=f"Contract Completed: {job_title}",
+                    email_body_html=f"""
+                        <html><body>
+                            <h2>Contract Completed!</h2>
+                            <p>Hi {client_user.name},</p>
+                            <p>The contract for {job_title} has been successfully completed.</p>
+                        </body></html>
+                    """,
+                    resource_type="contract",
+                    resource_id=contract.id
+                )
+            
+            if freelancer_user:
+                NotificationService.queue_notification(
+                    db=db,
+                    event_type=NotificationEventType.CONTRACT_COMPLETED.value,
+                    recipient_user_id=freelancer_user.id,
+                    email_subject=f"Contract Completed: {job_title}",
+                    email_body_html=f"""
+                        <html><body>
+                            <h2>Contract Completed!</h2>
+                            <p>Hi {freelancer_user.name},</p>
+                            <p>The contract for {job_title} has been successfully completed.</p>
+                        </body></html>
+                    """,
+                    resource_type="contract",
+                    resource_id=contract.id
+                )
+        except Exception as e:
+            logger.error(f"Failed to queue completion notification: {str(e)}")
+
         return contract
         
     except SQLAlchemyError as e:

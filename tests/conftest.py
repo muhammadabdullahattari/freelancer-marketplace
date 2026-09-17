@@ -28,6 +28,7 @@ class TestDatetime(datetime):
     @classmethod
     def now(cls, tz=None):
         return datetime.now(timezone.utc).replace(tzinfo=None)
+import app.core.startup
 with patch('app.core.startup.verify_supabase_connection', return_value=None):
     from app.database import Base, get_db
     from app.main import app

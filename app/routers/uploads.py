@@ -35,6 +35,18 @@ async def upload_profile_picture(
 ):
     logger.info(f"Uploading profile picture for user: {current_user.id}")
     
+    existing_picture = db.query(FileUpload).filter(
+        FileUpload.user_id == current_user.id,
+        FileUpload.file_type == FileType.PROFILE_PICTURE.value,
+        FileUpload.deleted_at == None
+    ).first()
+    
+    if existing_picture:
+        raise BusinessLogicException(
+            ErrorCode.ALREADY_EXISTS,
+            "Profile picture already exists"
+        )
+    
     file_upload = await FileStorageService.upload_file(
         file=file,
         file_type=FileType.PROFILE_PICTURE,
@@ -84,7 +96,8 @@ def delete_profile_picture(
     
     file_upload = db.query(FileUpload).filter(
         FileUpload.id == file_id,
-        FileUpload.uploaded_by_user_id == current_user.id
+        FileUpload.uploaded_by_user_id == current_user.id,
+        FileUpload.deleted_at == None
     ).first()
     
     if not file_upload:
@@ -190,7 +203,8 @@ def delete_proposal_attachment(
     
     file_upload = db.query(FileUpload).filter(
         FileUpload.id == file_id,
-        FileUpload.uploaded_by_user_id == current_user.id
+        FileUpload.uploaded_by_user_id == current_user.id,
+        FileUpload.deleted_at == None
     ).first()
     
     if not file_upload:

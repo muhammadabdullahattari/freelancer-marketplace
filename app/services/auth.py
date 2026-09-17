@@ -10,6 +10,8 @@ from datetime import datetime, timedelta, timezone
 from app.core.config import settings
 from uuid import UUID
 import logging
+from app.services.notification import NotificationService
+from app.models.notification import NotificationEventType
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +41,14 @@ def create_user(db: Session, user_data: UserCreate):
         logger.info(f"User created in Supabase Auth: {supabase_user_id}")
         
     except Exception as e:
+        error_msg = str(e).lower()
+        if "already been registered" in error_msg or "already exists" in error_msg:
+            logger.warning(f"User email already exists in Supabase Auth: {user_data.email}")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email already registered"
+            )
+
         logger.error(f"Supabase Auth creation failed: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -64,6 +74,33 @@ def create_user(db: Session, user_data: UserCreate):
         db.commit()
         db.refresh(user)
         logger.info(f"User created in local DB: {user.id}")
+
+        try:
+            role_display = "Client" if user.role == "CLIENT" else "Freelancer"
+            platform_url = getattr(settings, "PLATFORM_URL", "https://yourplatform.com")
+            
+            NotificationService.queue_notification(
+                db=db,
+                event_type=NotificationEventType.USER_REGISTERED.value,
+                recipient_user_id=user.id,
+                email_subject=f"Welcome to Freelancer Marketplace, {user.name}!",
+                email_body_html=f"""
+                    <html><body>
+                        <h2>Welcome to Freelancer Marketplace!</h2>
+                        <p>Hi {user.name},</p>
+                        <p>Your {role_display} account has been created successfully.</p>
+                        <p><a href="{platform_url}/dashboard">Go to Dashboard</a></p>
+                    </body></html>
+                """,
+                resource_type="user",
+                resource_id=user.id,
+                event_payload={"user_email": user.email, "user_role": user.role, "user_name": user.name}
+            )
+            logger.info(f"Welcome email queued for new user {user.id}")
+        except Exception as e:
+            logger.error(f"Failed to queue welcome email: {str(e)}")
+            # Don't fail user creation if notification fails
+
         return user
         
     except SQLAlchemyError as e:
@@ -161,6 +198,35 @@ def authenticate_user(user_data: UserLogin, request: Request, db: Session):
         user.last_login_at = datetime.now(timezone.utc)
         user.last_login_ip = ip_address
         db.commit()
+
+        # Queue Security Login Alert Notification (non-blocking)
+        try:
+            login_time = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+            NotificationService.queue_notification(
+                db=db,
+                event_type=NotificationEventType.SECURITY_EVENT.value,
+                recipient_user_id=user.id,
+                email_subject="Security Alert: New Login to your Freelancer Marketplace Account",
+                email_body_html=f"""
+                    <html><body>
+                        <h2>Security Alert: New Account Login</h2>
+                        <p>Hi {user.name},</p>
+                        <p>We detected a new login to your account on <strong>{login_time}</strong>.</p>
+                        <ul>
+                            <li><strong>IP Address:</strong> {ip_address or 'Unknown'}</li>
+                            <li><strong>Device / Browser:</strong> {user_agent or 'Unknown'}</li>
+                        </ul>
+                        <p>If this was you, no action is needed. If you did not authorize this login, please change your password immediately.</p>
+                    </body></html>
+                """,
+                resource_type="user",
+                resource_id=user.id,
+                event_payload={"login_time": login_time, "ip_address": ip_address, "user_agent": user_agent},
+                trigger_action=f"login_{int(datetime.now(timezone.utc).timestamp())}"
+            )
+            logger.info(f"Security login alert notification queued for user {user.id}")
+        except Exception as notif_err:
+            logger.error(f"Failed to queue security login alert: {str(notif_err)}")
     except:
         db.rollback()
         logger.warning("Failed to update last_login info")

@@ -40,6 +40,30 @@ def submit_milestone(db: Session,milestone_id: UUID,freelancer_user_id: UUID) ->
         db.commit()
         db.refresh(milestone)
         logger.info(f"Milestone submitted: {milestone_id}")
+
+        # Queue notification to client
+        try:
+            from app.services.notification import NotificationService
+            from app.models.notifications import NotificationEventType
+            
+            NotificationService.queue_notification(
+                db=db,
+                event_type=NotificationEventType.MILESTONE_SUBMITTED.value,
+                recipient_user_id=milestone.contract.client_id,
+                email_subject=f"Milestone Submitted for Review: {milestone.title}",
+                email_body_html=f"""
+                    <html><body>
+                        <h2>Milestone Submitted!</h2>
+                        <p>A milestone has been submitted for review: {milestone.title}</p>
+                    </body></html>
+                """,
+                resource_type="milestone",
+                resource_id=milestone.id,
+                triggered_by_user_id=milestone.contract.freelancer.user_id
+            )
+        except Exception as e:
+            logger.error(f"Failed to queue milestone submission notification: {str(e)}")
+
         return milestone
         
     except SQLAlchemyError as e:
@@ -66,6 +90,30 @@ def approve_milestone(db: Session,milestone_id: UUID,client_user_id: UUID) -> Mi
         db.commit()
         db.refresh(milestone)
         logger.info(f"Milestone approved: {milestone_id}")
+
+        # Queue notification to freelancer
+        try:
+            from app.services.notification import NotificationService
+            from app.models.notifications import NotificationEventType
+            
+            NotificationService.queue_notification(
+                db=db,
+                event_type=NotificationEventType.MILESTONE_APPROVED.value,
+                recipient_user_id=milestone.contract.freelancer.user_id,
+                email_subject="Your Milestone Was Approved! ✅",
+                email_body_html=f"""
+                    <html><body>
+                        <h2>Milestone Approved!</h2>
+                        <p>Your milestone '{milestone.title}' has been approved by the client.</p>
+                    </body></html>
+                """,
+                resource_type="milestone",
+                resource_id=milestone.id,
+                triggered_by_user_id=milestone.contract.client_id
+            )
+        except Exception as e:
+            logger.error(f"Failed to queue milestone approval notification: {str(e)}")
+
         return milestone
         
     except SQLAlchemyError as e:
@@ -92,6 +140,30 @@ def reject_milestone(db: Session,milestone_id: UUID,client_user_id: UUID) -> Mil
         db.commit()
         db.refresh(milestone)
         logger.info(f"Milestone rejected: {milestone_id}")
+
+        # Queue notification to freelancer
+        try:
+            from app.services.notification import NotificationService
+            from app.models.notifications import NotificationEventType
+            
+            NotificationService.queue_notification(
+                db=db,
+                event_type=NotificationEventType.MILESTONE_REJECTED.value,
+                recipient_user_id=milestone.contract.freelancer.user_id,
+                email_subject=f"Milestone Needs Revision: {milestone.title}",
+                email_body_html=f"""
+                    <html><body>
+                        <h2>Milestone Rejected / Needs Revision</h2>
+                        <p>Your milestone '{milestone.title}' was rejected and requires revision.</p>
+                    </body></html>
+                """,
+                resource_type="milestone",
+                resource_id=milestone.id,
+                triggered_by_user_id=milestone.contract.client_id
+            )
+        except Exception as e:
+            logger.error(f"Failed to queue milestone rejection notification: {str(e)}")
+
         return milestone
         
     except SQLAlchemyError as e:

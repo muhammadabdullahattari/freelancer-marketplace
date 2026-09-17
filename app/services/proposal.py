@@ -63,6 +63,44 @@ def submit_proposal(db: Session, job_id: UUID, freelancer_id: UUID, proposal_dat
         db.commit()
         db.refresh(proposal)
         logger.info(f"Proposal submitted: {proposal.id} by freelancer: {freelancer_id}")
+
+        # Queue notification to job client
+        try:
+            from app.services.notification import NotificationService
+            from app.models.notifications import NotificationEventType
+            from app.models.users import User
+            
+            client_user = db.query(User).filter(User.id == job.client_id).first()
+            freelancer_user = db.query(User).filter(User.id == freelancer.user_id).first()
+            client_name = client_user.name if client_user else "Client"
+            freelancer_name = freelancer_user.name if freelancer_user else "Freelancer"
+            
+            NotificationService.queue_notification(
+                db=db,
+                event_type=NotificationEventType.PROPOSAL_RECEIVED.value,
+                recipient_user_id=job.client_id,
+                email_subject=f"New Proposal for Your Job: {job.title}",
+                email_body_html=f"""
+                    <html><body>
+                        <h2>New Proposal Received!</h2>
+                        <p>Hi {client_name},</p>
+                        <p>You have a new proposal from {freelancer_name}</p>
+                        <p>Proposed Rate: ${proposal.proposed_rate}/hour</p>
+                    </body></html>
+                """,
+                resource_type="proposal",
+                resource_id=proposal.id,
+                triggered_by_user_id=freelancer.user_id,
+                event_payload={
+                    "job_title": job.title,
+                    "job_id": str(job.id),
+                    "freelancer_name": freelancer_name,
+                    "proposed_rate": proposal.proposed_rate
+                }
+            )
+        except Exception as e:
+            logger.error(f"Failed to queue proposal notification: {str(e)}")
+
         return proposal
         
     except SQLAlchemyError as e:
@@ -117,6 +155,39 @@ def accept_proposal(db: Session, proposal_id: UUID, client_id: UUID) -> Proposal
         db.commit()
         db.refresh(proposal)
         logger.info(f"Proposal accepted: {proposal_id}, contract created: {contract.id}")
+
+        # Queue acceptance notification to freelancer
+        try:
+            from app.services.notification import NotificationService
+            from app.models.notifications import NotificationEventType
+            from app.models.users import User
+            
+            freelancer_user = db.query(User).filter(User.id == proposal.freelancer.user_id).first()
+            client = db.query(User).filter(User.id == job.client_id).first()
+            freelancer_name = freelancer_user.name if freelancer_user else "Freelancer"
+            client_name = client.name if client else "Client"
+            
+            NotificationService.queue_notification(
+                db=db,
+                event_type=NotificationEventType.PROPOSAL_ACCEPTED.value,
+                recipient_user_id=proposal.freelancer.user_id,
+                email_subject="Your Proposal Was Accepted! 🎉",
+                email_body_html=f"""
+                    <html><body>
+                        <h2>Congratulations!</h2>
+                        <p>Hi {freelancer_name},</p>
+                        <p>{client_name} has accepted your proposal for: {job.title}</p>
+                        <p>Rate: ${proposal.proposed_rate}/hour</p>
+                    </body></html>
+                """,
+                resource_type="proposal",
+                resource_id=proposal.id,
+                triggered_by_user_id=job.client_id,
+                event_payload={"job_title": job.title, "client_name": client_name}
+            )
+        except Exception as e:
+            logger.error(f"Failed to queue acceptance notification: {str(e)}")
+
         return proposal
         
     except HTTPException:

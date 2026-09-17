@@ -6,6 +6,7 @@ from .proposal import submit_proposal, get_proposal, accept_proposal, reject_pro
 from .contract import create_contract_from_proposal, get_contract, add_milestone, get_contract_milestones, complete_contract, cancel_contract, get_user_contracts
 from .milestone import get_milestone, submit_milestone, approve_milestone, reject_milestone, release_milestone_payment
 from .review import create_review, get_review, get_freelancer_reviews, get_contract_reviews, update_freelancer_rating
+from .notification import NotificationService
 
 __all__ = [
     "create_user",
@@ -42,4 +43,5 @@ __all__ = [
     "get_freelancer_reviews",
     "get_contract_reviews",
     "update_freelancer_rating",
+    "NotificationService",
 ]

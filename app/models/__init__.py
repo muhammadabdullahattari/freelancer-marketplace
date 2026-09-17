@@ -9,7 +9,9 @@ from app.models.proposal import Proposal
 from app.models.contract import Contract
 from app.models.milestone import Milestone
 from app.models.review import Review
-from app.models.file_upload import  FileUpload
+from app.models.file_upload import FileUpload
+from app.models.notification_preference import NotificationPreference  # NEW
+from app.models.notification import Notification, NotificationEventType, NotificationStatus  # NEW
 
 __all__ = [
     "User",
@@ -23,5 +25,9 @@ __all__ = [
     "Contract",
     "Milestone",
     "Review",
-    "FileUpload"
+    "FileUpload",
+    "NotificationPreference",  
+    "Notification", 
+    "NotificationEventType",
+    "NotificationStatus"
 ]

@@ -17,12 +17,8 @@ logger = logging.getLogger(__name__)
 
 
 def sanitize_filename(filename: str) -> str:
-    """Remove special characters and prevent path traversal"""
-    # Remove anything that's not alphanumeric, underscore, hyphen, or dot
     sanitized = re.sub(r'[^a-zA-Z0-9._-]', '_', filename)
-    # Prevent path traversal
     sanitized = sanitized.replace('..', '_').replace('/', '_').replace('\\', '_')
-    # Limit length
     return sanitized[:100]
 
 
@@ -46,20 +42,29 @@ class FileStorageService:
             if not config:
                 raise ValidationException("Invalid file type")
             
-            file_content = await file.read()
-            file_size_bytes = len(file_content)
-            
-            max_size = FileConfig.get_max_size_bytes(file_type)
-            if file_size_bytes > max_size:
-                raise ValidationException(
-                    f"File size {file_size_bytes / 1024 / 1024:.2f}MB exceeds maximum {config['max_size_mb']}MB"
-                )
-            
             mime_type = file.content_type or "application/octet-stream"
             if not FileConfig.validate_file_type(file_type, mime_type):
                 raise ValidationException(
                     f"File type {mime_type} not allowed for {file_type.value}"
                 )
+            
+            max_size = FileConfig.get_max_size_bytes(file_type)
+            chunk_size = 64 * 1024  # 64KB chunks
+            chunks = []
+            file_size_bytes = 0
+            
+            while True:
+                chunk = await file.read(chunk_size)
+                if not chunk:
+                    break
+                file_size_bytes += len(chunk)
+                if file_size_bytes > max_size:
+                    raise ValidationException(
+                        f"File size exceeds maximum {config['max_size_mb']}MB"
+                    )
+                chunks.append(chunk)
+            
+            file_content = b"".join(chunks)
             
             timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
             filename_without_ext = os.path.splitext(file.filename)[0] if file.filename else "file"
@@ -108,7 +113,7 @@ class FileStorageService:
             else:
                 storage_url_res = supabase_service.storage.from_(bucket_name).create_signed_url(
                     path=unique_filename,
-                    expires_in=7 * 24 * 60 * 60  # 7 days
+                    expires_in=7 * 24 * 60 * 60  
                 )
                 storage_url = storage_url_res["signedURL"] if isinstance(storage_url_res, dict) else storage_url_res
             
@@ -164,20 +169,37 @@ class FileStorageService:
     
     @staticmethod
     def delete_file(file_upload: FileUpload, db: Session) -> None:
-        """Delete file from storage and database"""
         
         try:
             bucket_name = file_upload.storage_bucket
             storage_path = file_upload.storage_path
             
-            supabase_service.storage.from_(bucket_name).remove([storage_path])
-            logger.info(f"File deleted from Supabase Storage: {bucket_name}/{storage_path}")
+            try:
+                supabase_service.storage.from_(bucket_name).remove([storage_path])
+                logger.info(f"File deleted from Supabase Storage: {bucket_name}/{storage_path}")
+            except Exception as storage_err:
+                logger.error(f"Storage deletion failed: {str(storage_err)}")
+                raise BusinessLogicException(
+                    ErrorCode.INTERNAL_ERROR,
+                    f"Failed to delete file from storage: {str(storage_err)}"
+                )
             
-            file_upload.deleted_at = datetime.now(timezone.utc)
-            db.commit()
+            try:
+                file_upload.deleted_at = datetime.now(timezone.utc)
+                db.commit()
+                logger.info(f"File record marked as deleted in DB: {file_upload.id}")
+            except Exception as db_err:
+                db.rollback()
+                logger.error(f"DB update failed during file deletion: {str(db_err)}")
+                raise BusinessLogicException(
+                    ErrorCode.INTERNAL_ERROR,
+                    f"Failed to mark file as deleted in database: {str(db_err)}"
+                )
             
-            logger.info(f"File record marked as deleted in DB: {file_upload.id}")
-            
+        except ValidationException:
+            raise
+        except BusinessLogicException:
+            raise
         except Exception as e:
             logger.error(f"File deletion failed: {str(e)}")
             raise BusinessLogicException(
@@ -213,7 +235,6 @@ class FileStorageService:
             
     @staticmethod
     def cleanup_resource_files(db: Session, resource_type: str, resource_id: UUID) -> int:
-        """Clean up files associated with a resource"""
         try:
             if resource_type == "job":
                 files = db.query(FileUpload).filter(FileUpload.job_id == resource_id, FileUpload.deleted_at == None).all()

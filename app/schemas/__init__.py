@@ -7,6 +7,13 @@ from .proposal import ProposalCreate, ProposalResponse, ProposalDetailResponse, 
 from .contract import ContractResponse, ContractListResponse, ContractsListPaginatedResponse
 from .milestone import MilestoneCreate, MilestoneUpdate, MilestoneResponse
 from .review import ReviewCreate, ReviewUpdate, ReviewResponse, ReviewPublicResponse, ReviewsListPaginatedResponse
+from .notification import (
+    NotificationResponse,
+    NotificationItemResponse,
+    NotificationHistoryPaginatedResponse,
+    NotificationPreferenceResponse,
+    NotificationPreferenceUpdate,
+)
 
 __all__ = [
     "UserResponse",
@@ -44,4 +51,9 @@ __all__ = [
     "ReviewResponse",
     "ReviewPublicResponse",
     "ReviewsListPaginatedResponse",
+    "NotificationResponse",
+    "NotificationItemResponse",
+    "NotificationHistoryPaginatedResponse",
+    "NotificationPreferenceResponse",
+    "NotificationPreferenceUpdate",
 ]
