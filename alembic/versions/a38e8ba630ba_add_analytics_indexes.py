@@ -154,7 +154,8 @@ def upgrade() -> None:
     op.create_index(
         'ix_reviews_contract_id',
         'reviews',
-        ['contract_id']
+        ['contract_id'],
+        if_not_exists=True
     )
 
 

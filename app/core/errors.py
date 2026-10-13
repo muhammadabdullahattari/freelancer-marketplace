@@ -32,6 +32,18 @@ class ErrorCode(str, Enum):
     SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE"
     RATE_LIMIT_EXCEEDED = "RATE_LIMIT_EXCEEDED"
 
+    PAYMENT_FAILED = "payment_failed"
+    INVALID_PAYMENT_STATE = "invalid_payment_state"
+    PAYMENT_NOT_FOUND = "payment_not_found"
+    REFUND_FAILED = "refund_failed"
+    INVALID_AMOUNT = "invalid_amount"
+    INVALID_CURRENCY = "invalid_currency"
+    CONTRACT_NOT_FOUND = "contract_not_found"
+    INVALID_CONTRACT_STATE = "invalid_contract_state"
+    INVALID_WEBHOOK = "invalid_webhook"
+    INVALID_PAYMENT_METHOD = "invalid_payment_method"
+
+
 class ErrorDetails(BaseModel):
     code: str
     message: str
@@ -44,8 +56,8 @@ class ErrorDetails(BaseModel):
 class ErrorResponse(BaseModel):
     error: ErrorDetails
 
+
 class APIException(Exception):
-    
     def __init__(self, code: ErrorCode, message: str, status_code: int, details: Optional[dict] = None, request_id: Optional[str] = None):
         self.code = code
         self.message = message
@@ -134,7 +146,8 @@ class BusinessLogicException(APIException):
             details,
             request_id
         )
-        
+
+
 class RateLimitException(APIException):
     def __init__(self, message: str = "Too many requests", request_id: Optional[str] = None):
         super().__init__(

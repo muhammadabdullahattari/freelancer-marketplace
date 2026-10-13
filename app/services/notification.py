@@ -1,10 +1,11 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import event
 from app.models.notification import Notification, NotificationEventType, NotificationStatus
 from app.models.notification_preference import NotificationPreference
 from app.models.users import User
 from app.core.errors import BusinessLogicException, ErrorCode, ValidationException
 from app.core.config import settings
-from app.celery_app import celery_app
+from task_engine import task
 from datetime import datetime, timezone
 from uuid import UUID
 import logging
@@ -122,17 +123,20 @@ class NotificationService:
             )
             
             db.add(notification)
-            db.commit()
-            db.refresh(notification)
+            db.flush()
             
-            logger.info(f"Notification created: {notification.id}")
+            logger.info(f"Notification record created in transaction: {notification.id}")
             
             if should_send:
-                try:
-                    task = send_notification_email.delay(str(notification.id))
-                    logger.info(f"Notification queued for delivery. Celery task: {task.id}")
-                except Exception as celery_err:
-                    logger.warning(f"Celery task dispatch skipped/failed for notification {notification.id}: {str(celery_err)}")
+                notif_id_str = str(notification.id)
+                @event.listens_for(db, "after_commit", once=True)
+                def send_email_after_commit(session):
+                    try:
+                        task_res = send_notification_email.delay(notif_id_str)
+                        task_id = getattr(task_res, "task_id", getattr(task_res, "id", None))
+                        logger.info(f"Notification queued for delivery after DB commit. Task: {task_id}")
+                    except Exception as err:
+                        logger.warning(f"Task dispatch skipped/failed for notification {notif_id_str}: {str(err)}")
             else:
                 logger.info(f"Notification skipped due to user preference: {skip_reason}")
             
@@ -148,8 +152,14 @@ class NotificationService:
                 f"Failed to queue notification: {str(e)}"
             )
 
-@celery_app.task(bind=True, max_retries=settings.NOTIFICATION_MAX_RETRIES)
-def send_notification_email(self, notification_id: str):
+@task(
+    name="send_notification_email",
+    queue="default",
+    max_attempts=settings.NOTIFICATION_MAX_RETRIES,
+    retry_delay_seconds=settings.NOTIFICATION_RETRY_DELAY_SECONDS,
+    timeout_seconds=300,
+)
+def send_notification_email(notification_id: str, *args, **kwargs):
     
     db = SessionLocal()
     
@@ -193,19 +203,15 @@ def send_notification_email(self, notification_id: str):
             
             notification.last_error_message = str(email_error)[:500]
             notification.last_error_code = "EMAIL_SEND_FAILED"
-            db.commit()
             
-            if self.request.retries < settings.NOTIFICATION_MAX_RETRIES:
-                countdown = settings.NOTIFICATION_RETRY_DELAY_SECONDS * (2 ** self.request.retries)
-                logger.info(
-                    f"Retrying notification {notification_id} "
-                    f"in {countdown}s (attempt {self.request.retries + 1})")
-                raise self.retry(exc=email_error, countdown=countdown)
-            else:
+            if notification.delivery_attempts >= settings.NOTIFICATION_MAX_RETRIES:
                 notification.status = NotificationStatus.FAILED.value
                 db.commit()
                 logger.error(f"Notification {notification_id} failed after max retries")
                 return {"status": "failed", "notification_id": notification_id}
+            else:
+                db.commit()
+                raise email_error
     
     except Exception as e:
         logger.error(f"Unexpected error in send_notification_email: {str(e)}", exc_info=True)

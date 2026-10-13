@@ -71,9 +71,6 @@ def create_user(db: Session, user_data: UserCreate):
     
     try:
         db.add(user)
-        db.commit()
-        db.refresh(user)
-        logger.info(f"User created in local DB: {user.id}")
 
         try:
             role_display = "Client" if user.role == "CLIENT" else "Freelancer"
@@ -96,10 +93,13 @@ def create_user(db: Session, user_data: UserCreate):
                 resource_id=user.id,
                 event_payload={"user_email": user.email, "user_role": user.role, "user_name": user.name}
             )
-            logger.info(f"Welcome email queued for new user {user.id}")
+            logger.info(f"Welcome email staged for new user {user.id}")
         except Exception as e:
-            logger.error(f"Failed to queue welcome email: {str(e)}")
-            # Don't fail user creation if notification fails
+            logger.error(f"Failed to stage welcome email: {str(e)}")
+
+        db.commit()
+        db.refresh(user)
+        logger.info(f"User created in local DB: {user.id}")
 
         return user
         
@@ -199,8 +199,8 @@ def authenticate_user(user_data: UserLogin, request: Request, db: Session):
         user.last_login_ip = ip_address
         db.commit()
 
-        # Queue Security Login Alert Notification (non-blocking)
         try:
+            login_timestamp = int(datetime.now(timezone.utc).timestamp())
             login_time = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
             NotificationService.queue_notification(
                 db=db,
@@ -221,8 +221,9 @@ def authenticate_user(user_data: UserLogin, request: Request, db: Session):
                 """,
                 resource_type="user",
                 resource_id=user.id,
+                triggered_by_user_id=user.id,
                 event_payload={"login_time": login_time, "ip_address": ip_address, "user_agent": user_agent},
-                trigger_action=f"login_{int(datetime.now(timezone.utc).timestamp())}"
+                trigger_action=f"login_{login_timestamp}"
             )
             logger.info(f"Security login alert notification queued for user {user.id}")
         except Exception as notif_err:

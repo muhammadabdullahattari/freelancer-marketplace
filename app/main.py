@@ -12,6 +12,7 @@ from app.routers.sessions import router as Sessionsrouter
 from app.routers.uploads import router as Uploadsrouter
 from app.routers.notifications import router as NotificationRouter
 from app.routers.analytics import router as AnalyticsRouter
+from app.routers.payments import router as PaymentsRouter
 from app.database import Base,engine
 import app.models
 from fastapi.exceptions import RequestValidationError, HTTPException 
@@ -51,6 +52,7 @@ app.include_router(Reviewsrouter)
 app.include_router(Uploadsrouter)
 app.include_router(NotificationRouter)
 app.include_router(AnalyticsRouter)
+app.include_router(PaymentsRouter)
 
 @app.get("/")
 def root():

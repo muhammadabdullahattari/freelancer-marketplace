@@ -60,6 +60,14 @@ def patch_auth_datetime():
     with patch('app.services.auth.datetime', TestDatetime):
         yield
 
+@pytest.fixture(autouse=True)
+def mock_celery_tasks(request):
+    if "test_send_notification_email_celery_task" in request.node.name:
+        yield
+    else:
+        with patch('app.services.notification.send_notification_email.delay') as mock_delay:
+            yield mock_delay
+
 @pytest.fixture
 def mock_supabase():
     mock_service = MagicMock()

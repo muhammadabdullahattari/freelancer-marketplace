@@ -14,80 +14,50 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
 from decimal import Decimal
 import logging
+from uuid import UUID
 
 logger = logging.getLogger(__name__)
 
 class AnalyticsService:
 
     @staticmethod
-    def get_marketplace_analytics(
-        db: Session,
-        start_date: datetime,
-        end_date: datetime
-    ) -> Dict[str, Any]:
+    def get_marketplace_analytics(db: Session,start_date: datetime,end_date: datetime) -> Dict[str, Any]:
         logger.info(f"Fetching marketplace analytics: {start_date} to {end_date}")
 
         try:
 
             jobs_created = db.query(func.count(Job.id)).filter(
-                Job.created_at >= start_date,
-                Job.created_at <= end_date,
-                Job.deleted_at == None
-            ).scalar() or 0
+                Job.created_at >= start_date,Job.created_at <= end_date,Job.deleted_at == None).scalar() or 0
 
             jobs_published = db.query(func.count(Job.id)).filter(
-                Job.published_at >= start_date,
-                Job.published_at <= end_date,
-                Job.deleted_at == None
-            ).scalar() or 0
+                Job.published_at >= start_date,Job.published_at <= end_date,Job.deleted_at == None).scalar() or 0
 
-            jobs_completed = db.query(func.count(Job.id)).filter(
-                Job.closed_at >= start_date,
-                Job.closed_at <= end_date,
-                Job.status == JobStatus.COMPLETED,
-                Job.deleted_at == None
-            ).scalar() or 0
+            jobs_completed = db.query(func.count(Job.id)).filter(Job.closed_at >= start_date,
+                Job.closed_at <= end_date,Job.status == JobStatus.COMPLETED,Job.deleted_at == None).scalar() or 0
 
             completion_rate = (jobs_completed / jobs_published * 100) if jobs_published > 0 else 0.0
 
-            proposals_submitted = db.query(func.count(Proposal.id)).filter(
-                Proposal.created_at >= start_date,
-                Proposal.created_at <= end_date,
-                Proposal.deleted_at == None
-            ).scalar() or 0
+            proposals_submitted = db.query(func.count(Proposal.id)).filter(Proposal.created_at >= start_date,
+                Proposal.created_at <= end_date,Proposal.deleted_at == None).scalar() or 0
 
-            proposals_accepted = db.query(func.count(Proposal.id)).filter(
-                Proposal.accepted_at >= start_date,
-                Proposal.accepted_at <= end_date,
-                Proposal.deleted_at == None
-            ).scalar() or 0
+            proposals_accepted = db.query(func.count(Proposal.id)).filter(Proposal.accepted_at >= start_date,
+                Proposal.accepted_at <= end_date,Proposal.deleted_at == None).scalar() or 0
 
             acceptance_rate = (proposals_accepted / proposals_submitted * 100) if proposals_submitted > 0 else 0.0
 
-            total_contract_value = db.query(func.sum(Contract.total_amount)).filter(
-                Contract.created_at >= start_date,
-                Contract.created_at <= end_date,
-                Contract.deleted_at == None
-            ).scalar() or Decimal('0')
+            total_contract_value = db.query(func.sum(Contract.total_amount)).filter(Contract.created_at >= start_date,
+                Contract.created_at <= end_date,Contract.deleted_at == None).scalar() or Decimal('0')
 
-            contracts_completed = db.query(func.count(Contract.id)).filter(
-                Contract.completed_at >= start_date,
-                Contract.completed_at <= end_date,
-                Contract.status == ContractStatus.COMPLETED,
-                Contract.deleted_at == None
-            ).scalar() or 0
+            contracts_completed = db.query(func.count(Contract.id)).filter(Contract.completed_at >= start_date,
+                Contract.completed_at <= end_date,Contract.status == ContractStatus.COMPLETED,
+                Contract.deleted_at == None).scalar() or 0
 
-            active_clients = db.query(func.count(func.distinct(Job.client_id))).filter(
-                Job.created_at >= start_date,
-                Job.created_at <= end_date,
-                Job.deleted_at == None
-            ).scalar() or 0
+            active_clients = db.query(func.count(func.distinct(Job.client_id))).filter(Job.created_at >= start_date,
+                Job.created_at <= end_date,Job.deleted_at == None).scalar() or 0
 
             active_freelancers = db.query(func.count(func.distinct(Proposal.freelancer_id))).filter(
-                Proposal.created_at >= start_date,
-                Proposal.created_at <= end_date,
-                Proposal.deleted_at == None
-            ).scalar() or 0
+                Proposal.created_at >= start_date,Proposal.created_at <= end_date,
+                Proposal.deleted_at == None).scalar() or 0
 
             return {
                 "period": {
@@ -127,16 +97,11 @@ class AnalyticsService:
             raise BusinessLogicException(ErrorCode.INTERNAL_ERROR, f"Analytics failed: {str(e)}")
 
     @staticmethod
-    def get_job_analytics(
-        db: Session,
-        client_id: str,
-        start_date: datetime,
-        end_date: datetime
-    ) -> Dict[str, Any]:
+    def get_job_analytics(db: Session, client_id: str, start_date: datetime, end_date: datetime) -> Dict[str, Any]:
         logger.info(f"Fetching job analytics for client {client_id}")
 
         try:
-            from uuid import UUID
+            
             client_uuid = UUID(client_id)
 
             client = db.query(User).filter(User.id == client_uuid).first()
@@ -218,17 +183,11 @@ class AnalyticsService:
             raise BusinessLogicException(ErrorCode.INTERNAL_ERROR, f"Job analytics failed: {str(e)}")
 
     @staticmethod
-    def get_proposal_analytics(
-        db: Session,
-        user_id: str,
-        role: str,
-        start_date: datetime,
-        end_date: datetime
-    ) -> Dict[str, Any]:
+    def get_proposal_analytics(db: Session,user_id: str,role: str,start_date: datetime,end_date: datetime) -> Dict[str, Any]:
         logger.info(f"Fetching proposal analytics for {role} {user_id}")
 
         try:
-            from uuid import UUID
+            
             user_uuid = UUID(user_id)
 
             if role == "CLIENT":
@@ -316,17 +275,11 @@ class AnalyticsService:
             raise BusinessLogicException(ErrorCode.INTERNAL_ERROR, f"Proposal analytics failed: {str(e)}")
 
     @staticmethod
-    def get_milestone_analytics(
-        db: Session,
-        user_id: str,
-        role: str,
-        start_date: datetime,
-        end_date: datetime
-    ) -> Dict[str, Any]:
+    def get_milestone_analytics(db: Session,user_id: str,role: str,start_date: datetime,end_date: datetime) -> Dict[str, Any]:
         logger.info(f"Fetching milestone analytics for {role} {user_id}")
 
         try:
-            from uuid import UUID
+            
             user_uuid = UUID(user_id)
 
             if role == "CLIENT":
@@ -337,7 +290,6 @@ class AnalyticsService:
                             Contract.deleted_at == None
                         )
                     ),
-                    Milestone.status == MilestoneStatus.SUBMITTED,
                     Milestone.submitted_at >= start_date,
                     Milestone.submitted_at <= end_date
                 ).scalar() or 0
@@ -349,9 +301,10 @@ class AnalyticsService:
                             Contract.deleted_at == None
                         )
                     ),
-                    Milestone.status == MilestoneStatus.APPROVED,
-                    Milestone.approved_at >= start_date,
-                    Milestone.approved_at <= end_date
+                    or_(
+                        Milestone.status.in_([MilestoneStatus.APPROVED, MilestoneStatus.PAYMENT_RELEASED]),
+                        and_(Milestone.approved_at >= start_date, Milestone.approved_at <= end_date)
+                    )
                 ).scalar() or 0
 
                 milestones_rejected = db.query(func.count(Milestone.id)).filter(
@@ -361,9 +314,7 @@ class AnalyticsService:
                             Contract.deleted_at == None
                         )
                     ),
-                    Milestone.status == MilestoneStatus.REJECTED,
-                    Milestone.rejected_at >= start_date,
-                    Milestone.rejected_at <= end_date
+                    Milestone.status == MilestoneStatus.REJECTED
                 ).scalar() or 0
 
                 overdue_milestones = db.query(func.count(Milestone.id)).filter(
@@ -374,7 +325,8 @@ class AnalyticsService:
                         )
                     ),
                     Milestone.due_date < datetime.now(timezone.utc),
-                    Milestone.status != MilestoneStatus.APPROVED
+                    Milestone.status.notin_([MilestoneStatus.APPROVED, MilestoneStatus.PAYMENT_RELEASED]),
+                    Milestone.approved_at == None
                 ).scalar() or 0
 
             elif role == "FREELANCER":
@@ -389,7 +341,6 @@ class AnalyticsService:
                             Contract.deleted_at == None
                         )
                     ),
-                    Milestone.status == MilestoneStatus.SUBMITTED,
                     Milestone.submitted_at >= start_date,
                     Milestone.submitted_at <= end_date
                 ).scalar() or 0
@@ -401,9 +352,10 @@ class AnalyticsService:
                             Contract.deleted_at == None
                         )
                     ),
-                    Milestone.status == MilestoneStatus.APPROVED,
-                    Milestone.approved_at >= start_date,
-                    Milestone.approved_at <= end_date
+                    or_(
+                        Milestone.status.in_([MilestoneStatus.APPROVED, MilestoneStatus.PAYMENT_RELEASED]),
+                        and_(Milestone.approved_at >= start_date, Milestone.approved_at <= end_date)
+                    )
                 ).scalar() or 0
 
                 milestones_rejected = db.query(func.count(Milestone.id)).filter(
@@ -413,9 +365,7 @@ class AnalyticsService:
                             Contract.deleted_at == None
                         )
                     ),
-                    Milestone.status == MilestoneStatus.REJECTED,
-                    Milestone.rejected_at >= start_date,
-                    Milestone.rejected_at <= end_date
+                    Milestone.status == MilestoneStatus.REJECTED
                 ).scalar() or 0
 
                 overdue_milestones = db.query(func.count(Milestone.id)).filter(
@@ -426,7 +376,8 @@ class AnalyticsService:
                         )
                     ),
                     Milestone.due_date < datetime.now(timezone.utc),
-                    Milestone.status != MilestoneStatus.APPROVED
+                    Milestone.status.notin_([MilestoneStatus.APPROVED, MilestoneStatus.PAYMENT_RELEASED]),
+                    Milestone.approved_at == None
                 ).scalar() or 0
 
             approval_rate = (milestones_approved / milestones_submitted * 100) if milestones_submitted > 0 else 0.0
@@ -453,14 +404,11 @@ class AnalyticsService:
             raise BusinessLogicException(ErrorCode.INTERNAL_ERROR, f"Milestone analytics failed: {str(e)}")
 
     @staticmethod
-    def get_freelancer_analytics(
-        db: Session,
-        freelancer_id: str
-    ) -> Dict[str, Any]:
+    def get_freelancer_analytics(db: Session,freelancer_id: str) -> Dict[str, Any]:
         logger.info(f"Fetching freelancer analytics for {freelancer_id}")
 
         try:
-            from uuid import UUID
+            
             freelancer_uuid = UUID(freelancer_id)
 
             freelancer = db.query(FreelancerProfile).filter(
@@ -510,7 +458,7 @@ class AnalyticsService:
                         Contract.deleted_at == None
                     )
                 ),
-                Milestone.status == MilestoneStatus.APPROVED,
+                Milestone.status.in_([MilestoneStatus.APPROVED, MilestoneStatus.PAYMENT_RELEASED]),
                 Milestone.approved_at <= Milestone.due_date
             ).scalar() or 0
 
@@ -521,7 +469,7 @@ class AnalyticsService:
                         Contract.deleted_at == None
                     )
                 ),
-                Milestone.status == MilestoneStatus.APPROVED
+                Milestone.status.in_([MilestoneStatus.APPROVED, MilestoneStatus.PAYMENT_RELEASED])
             ).scalar() or 0
 
             on_time_rate = (on_time_milestones / total_milestones * 100) if total_milestones > 0 else 0.0
@@ -547,14 +495,11 @@ class AnalyticsService:
             raise BusinessLogicException(ErrorCode.INTERNAL_ERROR, f"Freelancer analytics failed: {str(e)}")
 
     @staticmethod
-    def get_client_analytics(
-        db: Session,
-        client_id: str
-    ) -> Dict[str, Any]:
+    def get_client_analytics(db: Session,client_id: str) -> Dict[str, Any]:
         logger.info(f"Fetching client analytics for {client_id}")
 
         try:
-            from uuid import UUID
+            
             client_uuid = UUID(client_id)
 
             client = db.query(User).filter(User.id == client_uuid).first()
@@ -621,12 +566,7 @@ class AnalyticsService:
             raise BusinessLogicException(ErrorCode.INTERNAL_ERROR, f"Client analytics failed: {str(e)}")
 
     @staticmethod
-    def get_skill_analytics(
-        db: Session,
-        start_date: datetime,
-        end_date: datetime,
-        limit: int = 50
-    ) -> Dict[str, Any]:
+    def get_skill_analytics(db: Session,start_date: datetime,end_date: datetime,limit: int = 50) -> Dict[str, Any]:
         logger.info(f"Fetching skill analytics")
 
         try:
@@ -636,7 +576,8 @@ class AnalyticsService:
                 Skill.name,
                 func.count(func.distinct(Job.id)).label('job_count'),
                 func.count(func.distinct(Proposal.id)).label('proposal_count'),
-                func.avg(Proposal.proposed_rate).label('avg_rate')
+                func.avg(Proposal.proposed_rate).label('avg_rate'),
+                func.count(func.distinct(case((Proposal.status == ProposalStatus.ACCEPTED, Proposal.id), else_=None))).label('accepted_count')
             ).join(JobSkill, JobSkill.skill_id == Skill.id).join(
                 Job, Job.id == JobSkill.job_id
             ).outerjoin(
@@ -656,7 +597,7 @@ class AnalyticsService:
                     "jobs_requesting": skill[2],
                     "proposals": skill[3],
                     "avg_hourly_rate": float(skill[4]) if skill[4] else 0.0,
-                    "success_rate": (skill[3] / skill[2] * 100) if skill[2] > 0 else 0.0
+                    "success_rate": round(min(100.0, (skill[5] / skill[3] * 100.0)), 2) if (skill[3] and skill[3] > 0) else 0.0
                 }
                 for skill in top_skills
             ]
@@ -673,46 +614,62 @@ class AnalyticsService:
             raise BusinessLogicException(ErrorCode.INTERNAL_ERROR, f"Skill analytics failed: {str(e)}")
 
     @staticmethod
-    def get_trend_analytics(
-        db: Session,
-        start_date: datetime,
-        end_date: datetime,
-        granularity: str = "day"
-    ) -> Dict[str, Any]:
+    def get_trend_analytics(db: Session,start_date: datetime,end_date: datetime,granularity: str = "day") -> Dict[str, Any]:
         logger.info(f"Fetching trend analytics (granularity: {granularity})")
 
         try:
-
-            if granularity == "month":
-                date_trunc = func.date_trunc('month', Job.created_at)
-            elif granularity == "week":
-                date_trunc = func.date_trunc('week', Job.created_at)
-            else:
-                date_trunc = func.date_trunc('day', Job.created_at)
-
-            trends = db.query(
-                date_trunc.label('period'),
-                func.count(func.distinct(Job.id)).label('jobs_created'),
-                func.count(func.distinct(Proposal.id)).label('proposals_submitted'),
-                func.count(func.distinct(Contract.id)).label('contracts_created')
-            ).outerjoin(
-                Proposal, Proposal.created_at >= date_trunc
-            ).outerjoin(
-                Contract, Contract.created_at >= date_trunc
+            jobs_by_date = db.query(
+                func.date(Job.created_at).label('period'),
+                func.count(Job.id).label('jobs_created')
             ).filter(
                 Job.created_at >= start_date,
                 Job.created_at <= end_date,
                 Job.deleted_at == None
-            ).group_by(date_trunc).order_by(date_trunc).all()
+            ).group_by(func.date(Job.created_at)).all()
+
+            proposals_by_date = db.query(
+                func.date(Proposal.created_at).label('period'),
+                func.count(Proposal.id).label('proposals_submitted')
+            ).filter(
+                Proposal.created_at >= start_date,
+                Proposal.created_at <= end_date,
+                Proposal.deleted_at == None
+            ).group_by(func.date(Proposal.created_at)).all()
+
+            contracts_by_date = db.query(
+                func.date(Contract.created_at).label('period'),
+                func.count(Contract.id).label('contracts_created')
+            ).filter(
+                Contract.created_at >= start_date,
+                Contract.created_at <= end_date,
+                Contract.deleted_at == None
+            ).group_by(func.date(Contract.created_at)).all()
+
+            trends_map: Dict[str, Dict[str, int]] = {}
+
+            for row in jobs_by_date:
+                if row[0]:
+                    d_str = str(row[0])
+                    trends_map.setdefault(d_str, {"jobs_created": 0, "proposals_submitted": 0, "contracts_created": 0})["jobs_created"] = row[1]
+
+            for row in proposals_by_date:
+                if row[0]:
+                    d_str = str(row[0])
+                    trends_map.setdefault(d_str, {"jobs_created": 0, "proposals_submitted": 0, "contracts_created": 0})["proposals_submitted"] = row[1]
+
+            for row in contracts_by_date:
+                if row[0]:
+                    d_str = str(row[0])
+                    trends_map.setdefault(d_str, {"jobs_created": 0, "proposals_submitted": 0, "contracts_created": 0})["contracts_created"] = row[1]
 
             trend_data = [
                 {
-                    "period": trend[0].isoformat() if trend[0] else None,
-                    "jobs_created": trend[1],
-                    "proposals_submitted": trend[2],
-                    "contracts_created": trend[3]
+                    "period": f"{d_key}T00:00:00Z" if len(d_key) == 10 else d_key,
+                    "jobs_created": metrics["jobs_created"],
+                    "proposals_submitted": metrics["proposals_submitted"],
+                    "contracts_created": metrics["contracts_created"]
                 }
-                for trend in trends
+                for d_key, metrics in sorted(trends_map.items())
             ]
 
             return {

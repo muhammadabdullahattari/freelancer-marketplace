@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     
     REDIS_URL: str = "redis://localhost:6379/0"
 
+    TASK_ENGINE_BROKER: str = "native"
+    TASK_ENGINE_QUEUES: str = "default,payments"
+
     CELERY_BROKER_URL: str = "redis://localhost:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/1"
     CELERY_TASK_SERIALIZER: str = "json"
@@ -47,8 +50,29 @@ class Settings(BaseSettings):
     SMTP_USER: str | None = None
     SMTP_PASSWORD: str | None = None
     SMTP_TLS: bool = True
-
-    model_config = SettingsConfigDict(env_file=".env",extra="ignore")
+    
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_PUBLISHABLE_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+    STRIPE_API_VERSION: str = "2024-04-10"
+    STRIPE_MAX_RETRIES: int = 3
+    STRIPE_TIMEOUT: int = 30
+    
+    PAYMENT_ENVIRONMENT: str = "test"  
+    DEFAULT_CURRENCY: str = "USD"
+    PAYMENT_CONFIRMATION_TIMEOUT: int = 3600  
+    PAYMENT_SUCCESS_WEBHOOK_TIMEOUT: int = 300 
+    
+    WEBHOOK_TIMEOUT: int = 30
+    WEBHOOK_MAX_RETRIES: int = 5
+    WEBHOOK_RETRY_BACKOFF: str = "exponential" 
+    WEBHOOK_RETRY_INITIAL_DELAY: int = 60  
+    
+    PAYMENT_RECONCILIATION_ENABLED: bool = True
+    PAYMENT_RECONCILIATION_SCHEDULE: str = "0 2 * * *" 
+    PAYMENT_RECONCILIATION_BATCH_SIZE: int = 100
+    
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 
 
 settings = Settings()

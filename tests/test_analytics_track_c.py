@@ -186,10 +186,81 @@ def test_client_activity_metrics(db_session: Session, client_user: User):
 
 def test_api_analytics_router_registration(client: TestClient):
     """
-    Test GET /api/v1/analytics/marketplace endpoint natively included in main app.
+    Test GET /api/analytics/marketplace endpoint natively included in main app.
     """
-    res = client.get("/api/v1/analytics/marketplace")
+    res = client.get("/api/analytics/marketplace")
     assert res.status_code == 200
     res_data = res.json()
     assert "jobs" in res_data
     assert "completion_rate" in res_data["jobs"]
+
+
+def test_skill_analytics_success_rate_boundary(db_session: Session, client_user: User, freelancer_user: User):
+    """Verify get_skill_analytics success_rate does not exceed 100.0 when multiple proposals exist for a job."""
+    now = datetime.now(timezone.utc)
+    start = now - timedelta(days=30)
+
+    job = Job(id=uuid.uuid4(), client_id=client_user.id, title="Python Dev Required", description="Test desc", budget_min=500.0, status=JobStatus.OPEN, created_at=now)
+    db_session.add(job)
+
+    skill = Skill(id=uuid.uuid4(), name="Python_Testing_Boundary_Skill")
+    db_session.add(skill)
+
+    job_skill = JobSkill(job_id=job.id, skill_id=skill.id)
+    db_session.add(job_skill)
+
+    prop1 = Proposal(id=uuid.uuid4(), job_id=job.id, freelancer_id=freelancer_user.id, cover_letter="Cover letter 1", proposed_rate=50.0, status=ProposalStatus.ACCEPTED, created_at=now)
+    other_freelancer = User(id=uuid.uuid4(), username="free2", name="Free Two", email="free2@test.com", role="FREELANCER")
+    db_session.add(other_freelancer)
+    prop2 = Proposal(id=uuid.uuid4(), job_id=job.id, freelancer_id=other_freelancer.id, cover_letter="Cover letter 2", proposed_rate=60.0, status=ProposalStatus.SUBMITTED, created_at=now)
+    db_session.add_all([prop1, prop2])
+    db_session.commit()
+
+    data = AnalyticsService.get_skill_analytics(db_session, start, now + timedelta(days=1))
+    target_skill = next((s for s in data["skills"] if s["skill_id"] == str(skill.id)), None)
+    assert target_skill is not None
+    assert target_skill["success_rate"] <= 100.0
+    assert target_skill["success_rate"] == 50.0
+
+    response_schema = SkillAnalyticsResponse(**data)
+    assert response_schema.skills[0].success_rate <= 100.0
+
+
+def test_payment_released_milestones_analytics(db_session: Session, client_user: User, freelancer_user: User):
+    """Verify PAYMENT_RELEASED milestones count as approved/submitted and are NOT marked overdue."""
+    now = datetime.now(timezone.utc)
+    start = now - timedelta(days=30)
+    past_due = now - timedelta(days=2)
+
+    fp = FreelancerProfile(id=uuid.uuid4(), user_id=freelancer_user.id, title="Senior Dev", hourly_rate=75.0)
+    db_session.add(fp)
+
+    job = Job(id=uuid.uuid4(), client_id=client_user.id, title="Backend Dev", description="Desc", status=JobStatus.CLOSED)
+    db_session.add(job)
+
+    prop = Proposal(id=uuid.uuid4(), job_id=job.id, freelancer_id=freelancer_user.id, cover_letter="Cover", proposed_rate=100.0, status=ProposalStatus.ACCEPTED)
+    db_session.add(prop)
+
+    contract = Contract(id=uuid.uuid4(), job_id=job.id, proposal_id=prop.id, client_id=client_user.id, freelancer_id=fp.id, title="Contract 1", total_amount=1000.0, status=ContractStatus.COMPLETED)
+    db_session.add(contract)
+
+    m1 = Milestone(
+        id=uuid.uuid4(),
+        contract_id=contract.id,
+        title="M1",
+        amount=500.0,
+        status=MilestoneStatus.PAYMENT_RELEASED,
+        due_date=past_due,
+        submitted_at=now - timedelta(days=5),
+        approved_at=now - timedelta(days=4),
+        payment_released_at=now - timedelta(days=4)
+    )
+    db_session.add(m1)
+    db_session.commit()
+
+    data = AnalyticsService.get_milestone_analytics(db_session, str(freelancer_user.id), "FREELANCER", start, now + timedelta(days=1))
+    
+    assert data["milestones"]["submitted"] == 1
+    assert data["milestones"]["approved"] == 1
+    assert data["milestones"]["overdue"] == 0
+    assert data["milestones"]["approval_rate"] == 100.0

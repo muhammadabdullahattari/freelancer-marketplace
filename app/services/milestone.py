@@ -33,6 +33,7 @@ def submit_milestone(db: Session,milestone_id: UUID,freelancer_user_id: UUID) ->
     try:
         milestone.status = MilestoneStatus.SUBMITTED
         milestone.submitted_at = datetime.now(timezone.utc)
+        milestone.rejected_at = None
         
         if contract.status == ContractStatus.ACTIVE:
             contract.status = ContractStatus.IN_PROGRESS
@@ -86,6 +87,7 @@ def approve_milestone(db: Session,milestone_id: UUID,client_user_id: UUID) -> Mi
     try:
         milestone.status = MilestoneStatus.APPROVED
         milestone.approved_at = datetime.now(timezone.utc)
+        milestone.rejected_at = None
         
         db.commit()
         db.refresh(milestone)

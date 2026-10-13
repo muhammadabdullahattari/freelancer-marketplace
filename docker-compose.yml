@@ -1,18 +1,4 @@
 services:
-  redis:
-    image: redis:7-alpine
-    container_name: freelancer_marketplace_redis
-    ports:
-      - "6379:6379"
-    command: redis-server --appendonly yes
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   app:
     build:
       context: .
@@ -21,51 +7,48 @@ services:
     env_file:
       - .env
     environment:
-      REDIS_URL: redis://redis:6379/0
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      TASK_ENGINE_BROKER: native
     ports:
       - "8000:8000"
-    depends_on:
-      redis:
-        condition: service_healthy
     volumes:
       - .:/app
-    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    command: sh -c "task-engine db migrate && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
-  celery_worker:
+  task_engine_worker:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: freelancer_marketplace_celery
+    container_name: freelancer_marketplace_worker
     env_file:
       - .env
     environment:
-      REDIS_URL: redis://redis:6379/0
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CELERY_RESULT_BACKEND: redis://redis:6379/1
-    depends_on:
-      redis:
-        condition: service_healthy
+      TASK_ENGINE_BROKER: native
     volumes:
       - .:/app
-    command: celery -A app.celery_app worker --loglevel=info
+    command: task-engine worker start --app app.task_engine_app:engine --queues payments,default --broker native
 
-  celery_flower:
+  task_engine_scheduler:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: freelancer_marketplace_flower
+    container_name: freelancer_marketplace_scheduler
+    env_file:
+      - .env
     environment:
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CELERY_RESULT_BACKEND: redis://redis:6379/1
-    ports:
-      - "5555:5555"
-    depends_on:
-      - redis
+      TASK_ENGINE_BROKER: native
     volumes:
       - .:/app
-    command: celery -A app.celery_app flower --port=5555
+    command: task-engine scheduler start --app app.task_engine_app:engine
 
-volumes:
-  redis_data:
+  task_engine_ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: freelancer_marketplace_task_console
+    env_file:
+      - .env
+    ports:
+      - "5555:5555"
+    volumes:
+      - .:/app
+    command: task-engine ui --port 5555
